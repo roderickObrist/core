@@ -1,7 +1,6 @@
 "use strict";
 
-const {is, db, log, wrap} = require("../index"),
-  r = Symbol("registry");
+const {log, wrap, S} = require("../index");
 
 function ns(regOrKey) {
   if (regOrKey.COLUMN_NAME) {
@@ -12,18 +11,17 @@ function ns(regOrKey) {
 }
 
 module.exports = class Join {
-  constructor(Base, registry) {
+  constructor(Base) {
     this.Base = Base;
     this.joins = [];
     this.foreignKeys = {};
-    this[r] = registry;
 
     this.join(Base, "FK");
   }
 
   join(Class, relationship) {
     let join = {Class, relationship},
-      registry = Class[this[r]];
+      registry = Class[S.registry];
 
     if (!relationship) {
       join.relationship = "FK";
@@ -62,7 +60,7 @@ module.exports = class Join {
 
       return wrap(
         callback,
-        this.Base[this[r]].db.bind(null, {
+        this.Base[S.registry].db.bind(null, {
           "sql": sql.sql,
           "nestTables": true
         }, sql.param),
@@ -70,7 +68,7 @@ module.exports = class Join {
           const val = {};
 
           value.forEach(join => {
-            const reg = join.Class[this[r]],
+            const reg = join.Class[S.registry],
               name = reg.options.name;
 
             val[name] = reg.rowToInstance(row[reg.options.name]);
@@ -161,8 +159,8 @@ module.exports = class Join {
     //   ]
     // }
 
-    const dbName = this.Base[this[r]].options.database,
-      baseName = this.Base[this[r]].options.name,
+    const dbName = this.Base[S.registry].options.database,
+      baseName = this.Base[S.registry].options.name,
       innerJoins = joins.slice(1),
       SELECT = {
         "sql": "SELECT ??.??.*",
@@ -175,7 +173,7 @@ module.exports = class Join {
 
     while (innerJoins.length) {
       let join = innerJoins.shift(),
-        registry = join.Class[this[r]],
+        registry = join.Class[S.registry],
         relationshipKeys,
         relationship;
 
@@ -224,7 +222,7 @@ module.exports = class Join {
       possibilites = [];
 
     for (let join of joins) {
-      let key = classKey + '-' + ns(join.Class[this[r]]);
+      let key = classKey + '-' + ns(join.Class[S.registry]);
 
       if (
         this.foreignKeys[key] &&

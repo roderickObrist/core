@@ -116,6 +116,9 @@ function queryFormat(query, values) {
     values = [values];
   }
 
+  // Copy array
+  values = [...values];
+
   return query.replace(/\??\?/g, (match, i) => {
     if (values.length === 0) {
       return match;
@@ -162,6 +165,8 @@ function query(pool, sql, param, callback) {
     return new Promise((resolve, reject) => {
       pool.query(sql, param, (err, data) => {
         if (err) {
+          err.query = sql;
+          err.param = param;
           return reject(err);
         }
 

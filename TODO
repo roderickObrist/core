@@ -1,10 +1,11 @@
-All thats left is  Class
- addGetSignature
- RAM Registry
+All thats left is Class
  check get with a acceptable cache age
- update()
- delete()
 
 and uptime
 
 and debugging obviously
+
+There should be some sort of guide for 
+1. config files
+2. command line "nc localhost 8000"
+3. rethinkdb (which I am rethinking)

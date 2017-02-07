@@ -145,9 +145,23 @@ function formatMultipleArgs(message, extra, level) {
 }
 
 exports.info = (data, stringified) => {
-  stamp(data, 'info');
-
   const t = new Date();
+
+  if (typeof data === "string") {
+    if (canHandleColors) {
+      const time = t.toTimeString().substr(0, 8);
+
+      console.log(`${time.bold.green}: ${data}`);
+
+      if (stringified) {
+        console.log(stringified);
+      }
+    }
+
+    return;
+  }
+
+  stamp(data, 'info');
 
   if (!stringified) {
     stringified = JSON.stringify(data.body);
@@ -161,7 +175,6 @@ exports.info = (data, stringified) => {
         return body;
       }, {});
   }
-
 
   store(data);
 
@@ -198,7 +211,7 @@ exports.warn = (message, extra) => {
     return console.log(`${data.path} ${JSON.stringify(data.body, '', 2)}`);
   }
 
-  console.log(`${data.path.bold.yellow} ${JSON.stringify(data.body, '', 2)}`);
+  console.log(`${data.body.code.bold.yellow} ${JSON.stringify(data.body, '', 2)}`);
 };
 
 exports.error = (message, extra) => {

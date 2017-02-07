@@ -1,10 +1,7 @@
 "use strict";
 
-const {is, log} = require('./'),
-  addBinding = Symbol(),
-  listeners = Symbol(),
-  parse = Symbol(),
-  emit = Symbol();
+const {is, log, S} = require('./'),
+  {addBinding, listeners, parse, emit} = S;
 
 module.exports = class EventEmitter {
   constructor() {
@@ -104,10 +101,11 @@ module.exports = class EventEmitter {
     return Boolean(this[listeners][name]);
   }
 
-  emit(name, argument) {
+  emit(name, argument, eventContext = {}) {
     return this[parse](name, argument, ({id, listener}) => {
-      let eventContext = {
-        "event": id
+      let metaArg = {
+        "event": id,
+        "target": eventContext.target || this
       };
 
       // listener is actually argument
@@ -116,7 +114,7 @@ module.exports = class EventEmitter {
       }
 
       while (id.length) {
-        this[emit](id, listener, eventContext);
+        this[emit](id, listener, metaArg);
 
         id = id.split('.')
           .slice(0, -1)

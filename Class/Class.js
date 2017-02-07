@@ -1,18 +1,47 @@
 "use strict";
 
-const {EventEmitter, wrap} = require('../index'),
-  {MysqlRegistry, RAMRegistry} = require('./Registry'),
-  Join = require('./Join'),
-  is = require("../is"),
-  db = require("../db"),
-  registry = Symbol(),
-  configureSet = Symbol();
+const {EventEmitter, wrap, S} = require('../index'),
+  {getSignatures, registry, configureSet, eventEmitter, ee, diff, order, limit} = S,
+  RAMRegistry = require('./RAMRegistry'),
+  GetSignature = require('./GetSignature'),
+  Join = require('./Join');
 
-module.exports = class Class extends EventEmitter {
+class Class extends EventEmitter {
+  static [eventEmitter]() {
+    if (this.hasOwnProperty(ee)) {
+      return this[ee];
+    }
+
+    this[ee] = new EventEmitter();
+
+    return this[ee];
+  }
+
+  static on(...args) {
+    const ee = this[eventEmitter]();
+
+    ee.on(...args);
+    return this;
+  }
+
+  static once(...args) {
+    const ee = this[eventEmitter]();
+
+    ee.once(...args);
+    return this;
+  }
+
+  static off(...args) {
+    const ee = this[eventEmitter]();
+
+    ee.off(...args);
+    return this;
+  }
+
   static configure(name, options = {}) {
     switch (name) {
     case "db":
-      this[registry] = new MysqlRegistry(options, this);
+      this[registry] = new (require('./mysql/MysqlRegistry'))(options, this);
       return;
 
     case "registry":
@@ -21,6 +50,13 @@ module.exports = class Class extends EventEmitter {
 
     case "set":
       return this[configureSet](options.column, options.values);
+
+    case "getSignature":
+      if (!this[getSignatures]) {
+        this[getSignatures] = [];
+      }
+
+      this[getSignatures].push(new GetSignature(options, this, registry));
     }
   }
 
@@ -73,7 +109,19 @@ module.exports = class Class extends EventEmitter {
     };
   }
 
+  static cleanRegistry() {
+    this[registry].clean();
+  }
+
   static get(...args) {
+    if (this[getSignatures]) {
+      for (let getSignature of this[getSignatures]) {
+        if (getSignature.test(args[0])) {
+          return getSignature.exec(...args);
+        }
+      }
+    }
+
     return this[registry].get(...args);
   }
 
@@ -98,23 +146,47 @@ module.exports = class Class extends EventEmitter {
   constructor(properties) {
     super();
 
-    for (let name of Object.keys(properties)) {
-      this[name] = properties[name];
-    }
+    Object.assign(this, properties);
   }
 
-  emit(...args) {
-    this.constructor.emit(...args);
-    return super.emit(...args);
+  emit(name, data) {
+    const ee = this.constructor[eventEmitter]();
+
+    super.emit(name, data);
+
+    ee.emit(name, data, {
+      "target": this
+    });
+
+    return this;
   }
 
-  delete(callback) {
+  delete() {
+    this.emit("delete");
+
     if (this[registry]) {
       this[registry].delete(this);
     }
   }
 
-  update() {
+  update(values, callback) {
+    const Class = this.constructor;
 
+    if (!Class[registry]) {
+      throw new Error("Don't know how to handle this yet");
+    }
+
+    let actualUpdate = Class[registry][diff](this, values);
+
+    if (actualUpdate) {
+      return Class[registry].update(this, actualUpdate, callback);
+    }
+
+    return wrap.transform(callback, (result, resolve) => resolve(this));
   }
-};
+}
+
+module.exports = Class;
+
+Class.get.order = order;
+Class.get.limit = limit;
