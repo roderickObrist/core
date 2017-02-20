@@ -129,7 +129,7 @@ BinLog.prototype.start = function () {
 BinLog.prototype.determinePacket = function (firstByte) {
   switch (firstByte) {
   case 0xfe:
-    return Packets.Eof;
+    return Packets.EofPacket;
 
   case 0xff:
     return Packets.Error;
@@ -145,6 +145,11 @@ BinLog.prototype.BinLogHeader = function (packet) {
   }
 
   this[packet.eventType](packet);
+};
+
+
+BinLog.prototype.EofPacket = function (packet) {
+  console.log("Close binl ng");
 };
 
 // https://dev.mysql.com/doc/internals/en/table-map-event.html

@@ -53,7 +53,7 @@ module.exports = class EventEmitter {
   }
 
   [addBinding](binding) {
-    if (!this[binding.id]) {
+    if (!this[listeners][binding.id]) {
       this.describe(binding.id);
     }
 

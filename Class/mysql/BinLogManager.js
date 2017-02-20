@@ -1,7 +1,7 @@
 "use strict";
 
 const BinLogSequence = require("./BinLogSequence"),
-  {Class, S} = require("../../index"),
+  {Class, S, log} = require("../../index"),
   {
     updateAcknowledge,
     deleteAcknowledge,
@@ -32,19 +32,30 @@ class BinLogManager extends Class {
     this.registries[key(registry.options)] = registry;
   }
 
-  createBinLog({host, user, password}) {
+  createBinLog({host, user, password}, delay = 1e3) {
     this.binLog = mysql.createConnection({host, user, password});
 
     this.binLog.query("SHOW BINARY LOGS", (e, binLogs) => {
       if (e) {
-        throw e;
+        // MySQL not running, try reconnecting
+        if (e.code === "ECONNREFUSED") {
+          log.warn("Unable to connect to MySQL");
+        } else {
+          log.error(e);
+        }
+
+        if (e.fatal) {
+          setTimeout(() => this.createBinLog({host, user, password}, delay + 1e3), delay);
+        }
+
+        return;
       }
 
       const details = binLogs.pop();
 
       this.binLog.query("select @@GLOBAL.binlog_checksum as checksum", (e, checksum) => {
         if (e) {
-          throw e;
+          return log.error(e);
         }
 
         const binLogSequence = new BinLogSequence({
@@ -55,6 +66,19 @@ class BinLogManager extends Class {
 
         this.binLog._protocol._enqueue(binLogSequence);
       });
+    });
+
+    this.binLog.on("error", e => {
+      switch (e.code) {
+      // Running binlog server closed or tcp socket closed gracefully
+      case "PROTOCOL_CONNECTION_LOST":
+        log.warn("Lost MySQL connection");
+        return this.createBinLog({host, user, password});
+
+      }
+
+      console.log(e);
+      log.error(e);
     });
   }
 

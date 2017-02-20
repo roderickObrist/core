@@ -27,11 +27,11 @@ exports.log = require('./log');
 
 exports.db = require('./db');
 
+exports.m = require("moment");
+
 exports.EventEmitter = require('./EventEmitter');
 
 exports.Class = require('./Class');
-
-exports.m = require("moment");
 
 exports.Command = require("./Command");
 

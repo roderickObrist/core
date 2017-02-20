@@ -78,7 +78,8 @@ class MysqlRegistry extends Registry {
             CHARACTER_SET_NAME, 
             COLUMN_COMMENT,
             COLUMN_TYPE,
-            DATA_TYPE
+            DATA_TYPE,
+            EXTRA
           FROM information_schema.columns
           WHERE table_schema = ? &&
             table_name = ?
@@ -203,6 +204,10 @@ class MysqlRegistry extends Registry {
             column.options = column.COLUMN_TYPE.slice(5, -1)
               .split(',')
               .map(value => value.slice(1, -1));
+
+            const index = column.optionsIndex = {};
+            column.options.forEach(option => index[option] = true);
+
             return;
 
           case types.SET:
@@ -300,7 +305,7 @@ class MysqlRegistry extends Registry {
       pk = this.keys.PRIMARY,
       isEveryPKInQuery = pk.every(pk => query.hasOwnProperty(pk.COLUMN_NAME)),
       isOneAutoIncrement = pk.length === 1 &&
-        this.columns[pk[0].COLUMN_NAME].Extra === 'auto_increment';
+        this.columns[pk[0].COLUMN_NAME].EXTRA === 'auto_increment';
 
     if (isEveryPKInQuery) {
       sql += ' WHERE ?';
@@ -565,7 +570,7 @@ class MysqlRegistry extends Registry {
     return instance;
   }
 
-  [diff](instance, newObject) {
+  [diff](instance, newObject, typeCheck = false) {
     let keys = this.columns.filter(col => {
       const name = col.COLUMN_NAME;
 
@@ -584,6 +589,15 @@ class MysqlRegistry extends Registry {
       case types.DATETIME2:
         console.log(col);
         throw "Manage this";
+
+      case types.ENUM:
+        if (
+          typeCheck &&
+            col.optionsIndex[newVal] !== true
+        ) {
+          return log.error(`"${newVal}" is not a suitable ENUM value`, {col});
+        }
+        break;
 
       case types.TINY:
       case types.SHORT:

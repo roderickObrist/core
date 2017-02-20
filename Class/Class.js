@@ -2,9 +2,15 @@
 
 const {EventEmitter, wrap, S} = require('../index'),
   {getSignatures, registry, configureSet, eventEmitter, ee, diff, order, limit} = S,
-  RAMRegistry = require('./RAMRegistry'),
   GetSignature = require('./GetSignature'),
+  RAMRegistry = require('./RAMRegistry'),
   Join = require('./Join');
+
+// Lazy load MysqlRegistry because some of that code requires Class
+let MysqlRegistry = function (...args) {
+  MysqlRegistry = require('./mysql/MysqlRegistry');
+  return new MysqlRegistry(...args);
+};
 
 class Class extends EventEmitter {
   static [eventEmitter]() {
@@ -41,7 +47,7 @@ class Class extends EventEmitter {
   static configure(name, options = {}) {
     switch (name) {
     case "db":
-      this[registry] = new (require('./mysql/MysqlRegistry'))(options, this);
+      this[registry] = new MysqlRegistry(options, this);
       return;
 
     case "registry":
@@ -176,7 +182,7 @@ class Class extends EventEmitter {
       throw new Error("Don't know how to handle this yet");
     }
 
-    let actualUpdate = Class[registry][diff](this, values);
+    let actualUpdate = Class[registry][diff](this, values, true);
 
     if (actualUpdate) {
       return Class[registry].update(this, actualUpdate, callback);

@@ -17,8 +17,7 @@ class Command extends Class {
     out(
       "Available commands are:\n" +
         commands.map((command, i) => `${String(i + 1).blue.bold}. ${command}`)
-          .join('\n') +
-        '\n',
+          .join('\n'),
       input => {
         let key = input;
 
