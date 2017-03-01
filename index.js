@@ -16,7 +16,7 @@ try {
 
   exports.config = {};
 }
-
+console.log(exports.config);
 if (!exports.config.dir) {
   exports.config.dir = dir;
 }
