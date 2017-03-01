@@ -10,7 +10,7 @@ exports.is = require('./is');
 try {
   exports.config = require(path.join(dir, 'config'));
 } catch (e) {
-  if (!e.message.startsWith("Cannot find module '../../config'")) {
+  if (!e.message.startsWith("Cannot find module ")) {
     throw e;
   }
 
@@ -21,8 +21,6 @@ if (!exports.config.dir) {
   exports.config.dir = dir;
 }
 
-exports.wrap = require('./wrap');
-
 exports.log = require('./log');
 
 exports.db = require('./db');
@@ -31,9 +29,9 @@ exports.m = require("moment");
 
 exports.EventEmitter = require('./EventEmitter');
 
-exports.Class = require('./Class');
+//exports.Class = require('./Class');
 
-exports.Command = require("./Command");
+//exports.Command = require("./Command");
 
 function onErr(err) {
   let details = {"path": "uncaughtException"};
