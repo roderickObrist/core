@@ -13,8 +13,11 @@
   "getSignatures",
   "registry",
   "configureSet",
-  "eventEmitter",
+
+  // Used by Class as a way of storing eventEmitter statically
+  "getEventEmitter",
   "ee",
+
   "updateAcknowledge",
   "deleteAcknowledge",
   "createAcknowledge",

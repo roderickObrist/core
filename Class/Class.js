@@ -1,19 +1,31 @@
+/* eslint global-require: 0 */
+
 "use strict";
 
-const {EventEmitter, wrap, S} = require('../index'),
-  {getSignatures, registry, configureSet, eventEmitter, ee, diff, order, limit} = S,
-  GetSignature = require('./GetSignature'),
-  RAMRegistry = require('./RAMRegistry'),
-  Join = require('./Join');
+const {EventEmitter, S, log} = require("../index"),
+  GetSignature = require("./GetSignature"),
+  Join = require("./Join"),
+  RAMRegistry = require("./RAMRegistry"),
+  {
+    getEventEmitter,
+    getSignatures,
+    registry,
+    configureSet,
+    ee,
+    diff,
+    order,
+    limit
+  } = S;
 
 // Lazy load MysqlRegistry because some of that code requires Class
-let MysqlRegistry = function (...args) {
-  MysqlRegistry = require('./mysql/MysqlRegistry');
+let MysqlRegistry = (...args) => {
+  MysqlRegistry = require("./mysql/MysqlRegistry");
+
   return new MysqlRegistry(...args);
 };
 
 class Class extends EventEmitter {
-  static [eventEmitter]() {
+  static [getEventEmitter]() {
     if (this.hasOwnProperty(ee)) {
       return this[ee];
     }
@@ -24,92 +36,94 @@ class Class extends EventEmitter {
   }
 
   static on(...args) {
-    const ee = this[eventEmitter]();
+    this[getEventEmitter]()
+      .on(...args);
 
-    ee.on(...args);
     return this;
   }
 
   static once(...args) {
-    const ee = this[eventEmitter]();
+    this[getEventEmitter]()
+      .once(...args);
 
-    ee.once(...args);
     return this;
   }
 
   static off(...args) {
-    const ee = this[eventEmitter]();
+    this[getEventEmitter]()
+      .off(...args);
 
-    ee.off(...args);
     return this;
   }
 
   static configure(name, options = {}) {
-    switch (name) {
-    case "db":
+    if (name === "db") {
       this[registry] = new MysqlRegistry(options, this);
-      return;
-
-    case "registry":
+    } else if (name === "registry") {
       this[registry] = new RAMRegistry(options, this);
-      return;
-
-    case "set":
-      return this[configureSet](options.column, options.values);
-
-    case "getSignature":
+    } else if (name === "set") {
+      this[configureSet](options.column, options.values);
+    } else if (name === "getSignature") {
       if (!this[getSignatures]) {
         this[getSignatures] = [];
       }
 
       this[getSignatures].push(new GetSignature(options, this, registry));
+    } else {
+      log.error("Unknown configure option", {
+        name,
+        options
+      });
     }
   }
 
-  static [configureSet](name, values) {
-    let column = name[0].toUpperCase() + name.slice(1),
-      asArr = `get${column}AsArray`;
+  static [configureSet] (name, values) {
+    const column = name[0].toUpperCase() + name.slice(1),
+      get = `get${column}AsArray`;
 
-    this.prototype[asArr] = function getSetAsArray() {
+    this.prototype[get] = function getSetAsArray() {
       return (this[column] || "")
-        .split(',');
+        .split(",");
     };
 
     this.prototype[`add${column}`] = function addToSet(value, ...args) {
-      let newValue = this[asArr]().filter(val => val !== value);
+      let newValue = this[get]()
+        .filter(val => val !== value);
 
       if (values.includes(value)) {
         newValue.push(value);
       }
 
-      newValue = newValue.join(',');
+      newValue = newValue.join(",");
 
-      return args[0] === true
-        ? newValue
-        : this.update({
-          [name]: newValue
-        }, ...args);
+      if (args[0] === true) {
+        return newValue;
+      }
+
+      return this.update({[name]: newValue}, ...args);
     };
 
     this.prototype[`remove${column}`] = function removeFromSet(value, ...args) {
-      let newValue = this[asArr]().filter(val => val !== value)
-        .join(',');
+      const newValue = this[get]()
+        .filter(val => val !== value)
+        .join(",");
 
-      return args[0] === true
-        ? newValue
-        : this.update({
-          [name]: newValue
-        }, ...args);
+      if (args[0] === true) {
+        return newValue;
+      }
+
+      return this.update({[name]: newValue}, ...args);
     };
 
     this.prototype[`has${column}`] = function hasInSet(value) {
-      return this[asArr]()
+      return this[get]()
         .includes(value);
     };
 
     this.prototype[`get${column}AsObject`] = function getSetAsObject() {
-      return this[asArr]().reduce((asObject, value) => {
+      return this[get]().reduce((asObject, value) => {
         value[asObject] = true;
+
         return asObject;
       }, {});
     };
@@ -121,7 +135,7 @@ class Class extends EventEmitter {
 
   static get(...args) {
     if (this[getSignatures]) {
-      for (let getSignature of this[getSignatures]) {
+      for (const getSignature of this[getSignatures]) {
         if (getSignature.test(args[0])) {
           return getSignature.exec(...args);
         }
@@ -131,22 +145,19 @@ class Class extends EventEmitter {
     return this[registry].get(...args);
   }
 
-  static create(query, callback) {
+  static create(query) {
     const r = this[registry];
 
     if (r) {
-      return r.create(query, callback);
+      return r.create(query);
     }
 
     throw new Error("no reg");
   }
 
-  static join(Class, relationship) {
-    let join = new Join(this, registry);
-
-    join.join(Class, relationship);
-
-    return join;
+  static join(ClassToJoin, relationship) {
+    return new Join(this)
+      .join(ClassToJoin, relationship);
   }
 
   constructor(properties) {
@@ -156,43 +167,43 @@ class Class extends EventEmitter {
   }
 
   emit(name, data) {
-    const ee = this.constructor[eventEmitter]();
-
     super.emit(name, data);
 
-    ee.emit(name, data, {
-      "target": this
-    });
-
-    return this;
+    this.constructor[getEventEmitter]()
+      .emit(name, data, {"target": this});
   }
 
   delete() {
     this.emit("delete");
 
     if (this[registry]) {
-      this[registry].delete(this);
+      return this.constructor[registry].delete(this);
     }
+
+    return new Promise(resolve => resolve(this));
   }
 
-  update(values, callback) {
-    const Class = this.constructor;
+  update(values) {
+    const ThisClass = this.constructor;
 
-    if (!Class[registry]) {
-      throw new Error("Don't know how to handle this yet");
+    if (!ThisClass[registry]) {
+      return log.error("Update Class has no registry", {
+        "className": ThisClass.name
+      });
     }
 
-    let actualUpdate = Class[registry][diff](this, values, true);
+    const actualUpdate = ThisClass[registry][diff](this, values, true);
 
     if (actualUpdate) {
-      return Class[registry].update(this, actualUpdate, callback);
+      return ThisClass[registry].update(this, actualUpdate);
     }
 
-    return wrap.transform(callback, (result, resolve) => resolve(this));
+    return new Promise(resolve => resolve(this));
   }
 }
 
-module.exports = Class;
-
 Class.get.order = order;
+
 Class.get.limit = limit;
+
+module.exports = Class;

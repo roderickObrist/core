@@ -29,7 +29,7 @@ exports.m = require("moment");
 
 exports.EventEmitter = require('./EventEmitter');
 
-//exports.Class = require('./Class');
+exports.Class = require('./Class');
 
 //exports.Command = require("./Command");
 
