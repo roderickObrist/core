@@ -1,47 +1,27 @@
 "use strict";
 
-const mysql = require('mysql'),
-  {is} = require('../index'),
+const mysql = require("mysql"),
+  {is, log} = require("../index"),
   e = v => mysql.escape(v),
   b = v => `(${v})`;
 
-
 function where(paramObj) {
-  let sql = '';
+  let sql = "";
 
-  for (let key of Object.keys(paramObj)) {
-    const value = paramObj[key],
-      isMultiple = is.array(value),
+  for (const [key, value] of Object.entries(paramObj)) {
+    const isMultiple = is.array(value),
       isNot = (/([!<>])$/).exec(key);
 
-    if (/password!?$/.test(key)) {
-
-      // Password Syntax:
-      // "password!": "Pass1234"
-      // "password": ["Pass1234", "Pass12343"]
-      // "password": ["Pass1234", "Pass12343"]
-      sql += 'password ';
-
-      if (isMultiple) {
-        sql += isNot ? 'NOT IN' : 'IN';
-
-        sql += b(value.map(v => `SHA1(${e(v)})`
-          .join(', ')));
-      } else {
-        sql += isNot ? '!' : '';
-
-        sql += '= SHA1(${e(v)})';
-      }
-    } else if (/ LIKE$/.test(key)) {
+    if (/ LIKE$/.test(key)) {
 
       // LIKE Syntax:
       // "col LIKE": "val%"
       // "col LIKE": ["val%", "%ue", "%alu%"]
       // "col NOT LIKE": ["val%", "%ue", "%alu%"]
       if (isMultiple) {
-        sql += b(value.map(v => `${key} ${e(v)}`).join(' || '));
+        sql += b(value.map(v => `${key} ${e(v)}`).join(" || "));
       } else {
-        sql += key + ' ' + mysql.escape(value);
+        sql += `${key} ${mysql.escape(value)}`;
       }
     } else if (key === "||") {
 
@@ -55,10 +35,10 @@ function where(paramObj) {
       //   "key2": "val2"
       // }, ...]
       if (isMultiple) {
-        sql += value.map(v => b(where(v).replace(/ && /g, ' || ')))
-          .join(' && ');
+        sql += value.map(v => b(where(v).replace(/ && /g, " || ")))
+          .join(" && ");
       } else {
-        sql += b(where(value).replace(/ && /g, ' || '));
+        sql += b(where(value).replace(/ && /g, " || "));
       }
     } else if (key === "&&") {
 
@@ -69,42 +49,54 @@ function where(paramObj) {
       // }, ...]
       if (isMultiple) {
         sql += b(value.map(v => b(where(v)))
-            .join(' || '));
+            .join(" || "));
       }
     } else if (isMultiple) {
-      sql += (isNot ? key.slice(0, -1) : key) + ' ' +
-        (isNot ? 'NOT ' : '') + 'IN' + b(e(value));
+      sql += isNot
+        ? key.slice(0, -1)
+        : key;
+
+      sql += " ";
+
+      sql += isNot
+        ? "NOT "
+        : "";
+
+      sql += `IN (${e(value)})`;
     } else {
-      sql += (isNot ? key.slice(0, -1) : key) + ' ';
+      sql += isNot
+        ? key.slice(0, -1)
+        : key;
+
+      sql += " ";
 
       if (value === null) {
-        sql += 'IS ' + (isNot ? 'NOT ' : '') + 'NULL';
+        sql += "IS ";
+
+        sql += isNot
+          ? "NOT "
+          : "";
+
+        sql += "NULL";
       } else {
-        sql += (isNot ? isNot[1] : '') + '= ' + e(value);
+        sql += isNot
+          ? isNot[1]
+          : "";
+
+        sql += `= ${e(value)}`;
       }
     }
 
-    sql += ' && ';
+    sql += " && ";
   }
 
   return sql.slice(0, -4);
 }
 
 function set(paramObj) {
-  var sql = '',
-    key;
-
-  for (key of Object.keys(paramObj)) {
-    sql += mysql.escapeId(key) + ' = ';
-
-    if (key === 'password') {
-      sql += `SHA1(${e(paramObj[key])}), `;
-    } else {
-      sql += e(paramObj[key]) + ', ';
-    }
-  }
-
-  return sql.slice(0, -2);
+  return Object.entries(paramObj)
+    .map(([key, value]) => `${mysql.escapeId(key)} = ${e(value)}`)
+    .join(", ");
 }
 
 module.exports = function queryFormat(query, values) {
@@ -112,37 +104,34 @@ module.exports = function queryFormat(query, values) {
     return query;
   }
 
-  if (!is.array(values)) {
-    values = [values];
-  }
-
-  // Copy array
-  values = [...values];
+  const valueArray = [].concat(values);
 
   return query.replace(/\??\?/g, (match, i) => {
-    if (values.length === 0) {
+    if (valueArray.length === 0) {
+      log.error("missingSQLInjection", {
+        query,
+        values
+      });
+
       return match;
     }
 
-    let insert = values.shift();
+    const insert = valueArray.shift();
 
-    if (insert instanceof Date) {
-      insert = new Date().toISOString()
-        .replace("T", " ")
-        .slice(0, -5);
-    }
-
-    if (match === '??') {
+    if (match === "??") {
       if (/ORDER BY[\s]*$/.test(query.slice(0, i))) {
-        insert = insert.split(' ');
-        return mysql.escapeId(insert[0]) + ' ' + (insert[1] === 'ASC' ? 'ASC' : 'DESC');
+        const [column, order] = insert.split(" "),
+          safeOrder = order === "ASC"
+            ? "ASC"
+            : "DESC";
+
+        return `${mysql.escapeId(column)} ${safeOrder}`;
       }
 
       return mysql.escapeId(insert);
     }
 
     // If the ? is following a WHERE and the param is an object
-    // there are some special use cases
     if (is.baseObject(insert)) {
       if (/WHERE[\s]*$/.test(query.slice(0, i))) {
         return where(insert);

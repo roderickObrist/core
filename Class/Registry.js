@@ -87,7 +87,8 @@ class Registry extends EventEmitter {
 
     for (let keyString in instances) {
       if (this[storage][keyString][key] === keyString) {
-        this.delete(instances[keyString]);
+        // Important to call prototype method because MysqlRegistry overwrites delete
+        Registry.prototype.delete.call(this, instances[keyString]);
       }
     }
   }

@@ -142,7 +142,7 @@ class BinLogManager extends Class {
   handleInsert(tableId, row) {
     const tKey = this.byTableId[tableId].key;
 
-    console.log(tKey, row);
+    //console.log(tKey, row);
     this.registries[tKey][createAcknowledge](row);
   }
 }
