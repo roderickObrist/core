@@ -333,16 +333,22 @@ class MysqlRegistry extends Registry {
           return reject(err);
         }
 
-        resolve(this.rowToInstance(result[1][0]));
+        const instance = this.rowToInstance(result[1][0]);
+
+        if (!this.options.allEvents) {
+          instance.emit("create", instance);
+        }
+
+        resolve(instance);
       });
     });
   }
 
   [createAcknowledge](row) {
-    const instance = this.rowToInstance(row, row, this.options.allEvents);
+    if (this.options.allEvents) {
+      const instance = this.rowToInstance(row, row, this.options.allEvents);
 
-    if (instance) {
-      instance.emit("create", this.rowToInstance(row));
+      instance.emit("create", instance);
     }
   }
 
