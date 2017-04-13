@@ -32,6 +32,10 @@ class BinLogManager extends Class {
     this.registries[key(registry.options)] = registry;
   }
 
+  remove(registry) {
+    delete this.registries[key(registry.options)];
+  }
+
   createBinLog({host, user, password}, delay = 1e3) {
     this.binLog = mysql.createConnection({host, user, password});
 
@@ -58,13 +62,20 @@ class BinLogManager extends Class {
           return log.error(e);
         }
 
-        const binLogSequence = new BinLogSequence({
-          "binLogName": details.Log_name,
-          "binLogPos": details.File_size,
-          "checksumEnabled": checksum[0].checksum !== "NONE"
-        }, this);
+        this.binLog.query("SELECT @@server_id AS serverId", (e, serverId) => {
+          if (e) {
+            return log.error(e);
+          }
 
-        this.binLog._protocol._enqueue(binLogSequence);
+          const binLogSequence = new BinLogSequence({
+            "binLogName": details.Log_name,
+            "binLogPos": details.File_size,
+            "checksumEnabled": checksum[0].checksum !== "NONE",
+            "serverId": serverId[0].serverId
+          }, this);
+
+          this.binLog._protocol._enqueue(binLogSequence);
+        });
       });
     });
 
@@ -143,6 +154,11 @@ class BinLogManager extends Class {
     const tKey = this.byTableId[tableId].key;
 
     this.registries[tKey][createAcknowledge](row);
+  }
+
+  handleStatementReplication() {
+    this.binlog.close();
+    log.error("MySQL Binary log uses statement replication");
   }
 }
 

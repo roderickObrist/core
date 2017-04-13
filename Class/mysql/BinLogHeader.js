@@ -13,6 +13,14 @@ BinLogHeader.prototype.parse = function (parser) {
   this.typeCode = parser.parseUnsignedNumber(1);
 
   switch (this.typeCode) {
+  // XID, very common
+  case 0x10:
+    return;
+
+  case 0x02:
+    this.eventType = "query";
+    break;
+
   case 0x13:
     this.eventType = "tableMap";
     break;

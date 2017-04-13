@@ -2,9 +2,10 @@
 
 // https://dev.mysql.com/doc/internals/en/com-binlog-dump.html
 
-function ComBinLog({binLogName, binLogPos}) {
+function ComBinLog({binLogName, binLogPos, serverId}) {
   this.binLogName = binLogName;
   this.binLogPos = binLogPos;
+  this.serverId = serverId;
 }
 
 ComBinLog.prototype.write = function (writer) {
@@ -18,7 +19,7 @@ ComBinLog.prototype.write = function (writer) {
   writer.writeUnsignedNumber(2, 0);
 
   // Server ID
-  writer.writeUnsignedNumber(4, 1);
+  writer.writeUnsignedNumber(4, this.serverId);
 
   writer.writeNullTerminatedString(this.binLogName);
 };

@@ -2,13 +2,9 @@
 
 const types = require("mysql/lib/protocol/constants/types"),
   {is, db, wrap, log, S} = require('../../index'),
-  BinLogManager = require('./BinLogManager'),
   {
     storage,
     pendingUpdate,
-    updateAcknowledge,
-    deleteAcknowledge,
-    createAcknowledge,
     diff,
     order,
     limit
@@ -54,13 +50,7 @@ class MysqlRegistry extends Registry {
     }
 
     this.refreshSchema(() => {
-      // Subscribe to changes from the binary log
-      BinLogManager.create({
-        "host": options.host
-      }, (e, binLogManager) => binLogManager.add(this));
-
       needsToBeReady.forEach(func => delete this[func]);
-
       this.emit("ready");
     });
   }
@@ -206,6 +196,7 @@ class MysqlRegistry extends Registry {
               .map(value => value.slice(1, -1));
 
             const index = column.optionsIndex = {};
+
             column.options.forEach(option => index[option] = true);
 
             return;
@@ -292,9 +283,6 @@ class MysqlRegistry extends Registry {
       throw new Error("Create with array is not implemented yet");
     }
 
-    // We need to line this up to the binary log
-    // Or do we?
-
     let param = [this.options.database, this.options.name, query, this.options.database, this.options.name],
       sql = `
         INSERT INTO ??.??
@@ -344,187 +332,116 @@ class MysqlRegistry extends Registry {
     });
   }
 
-  [createAcknowledge](row) {
-    if (this.options.allEvents) {
-      const instance = this.rowToInstance(row, row, this.options.allEvents);
-
-      instance.emit("create", instance);
-    }
-  }
-
   update(instance, values, callback) {
-    // Only a small part of this function is to execute the
-    // query, the rest of this func is involved with callback
-    // management/optimisation
-    const exec = values => {
-      const currentPK = {};
+    let updateQueue = instance[pendingUpdate];
 
-      this.keys.PRIMARY.forEach(key => {
-        currentPK[key.COLUMN_NAME] = instance[key.COLUMN_NAME];
+    if (updateQueue) {
+      let unresolvedUpdate = this[diff](updateQueue.values, values);
+
+      if (unresolvedUpdate) {
+        if (!updateQueue.nextUpdate) {
+          updateQueue.nextUpdate = {};
+          updateQueue.nextOnUpdate = [];
+        }
+
+        Object.assign(updateQueue.nextUpdate, diff);
+
+        return wrap.transform(callback, (result, resolve) => {
+          updateQueue.nextOnUpdate.push(resolve);
+        });
+      }
+
+      // All we have to do is wait
+      return wrap.transform(callback, (result, resolve) => {
+        updateQueue.onUpdate.push(resolve);
+      });
+    }
+
+    updateQueue = instance[pendingUpdate] = {
+      values,
+      "onUpdate": []
+    };
+
+    wrap.transform(callback, (result, resolve) => {
+      updateQueue.onUpdate.push(resolve);
+    });
+
+    const currentPK = {};
+
+    this.keys.PRIMARY.forEach(key => {
+      currentPK[key.COLUMN_NAME] = instance[key.COLUMN_NAME];
+    });
+
+    this.db(`
+      UPDATE ??.??
+      SET ?
+      WHERE ?;
+    `, [
+      this.options.database,
+      this.options.name,
+      values,
+      currentPK
+    ], (e, result) => {
+      if (e) {
+        return log.error(e);
+      }
+
+      if (result.affectedRows !== 1) {
+        return log.error("Instance lost during update", {instance, values, result});
+      }
+
+      // This should only happen in the case of 3 consecutive updates
+      // {A: 1}   {A: 0}  {A: 1}
+      // execed  (grouped & exec)
+      if (result.changedRows !== 1) {
+        log.warn("Wasted Update", {instance, values, result});
+      }
+
+      const newPK = {};
+
+      this.keys.PRIMARY.forEach(({COLUMN_NAME}) => {
+        newPK[COLUMN_NAME] = values[COLUMN_NAME] || currentPK[COLUMN_NAME];
       });
 
       this.db(`
-        UPDATE ??.??
-        SET ?
-        WHERE ?;
+        SELECT *
+        FROM ??.??
+        WHERE ?
       `, [
         this.options.database,
         this.options.name,
-        values,
-        currentPK
+        newPK
       ], (e, result) => {
         if (e) {
           return log.error(e);
         }
 
-        if (result.affectedRows !== 1) {
+        if (result.length === 0) {
           return log.error("Instance lost during update", {instance, values, result});
         }
 
-        // This should only happen in the case of 3 consecutive updates
-        // {A: 1}   {A: 0}  {A: 1}
-        // execed  (grouped & exec)
-        if (result.changedRows !== 1) {
-          log.warn("Wasted Update", {instance, values, result});
-        }
+        let diffToInstance = this[diff](instance, result[0]);
 
-        let pending = instance[pendingUpdate] || [],
-          i = 0;
-
-        while (i < pending.length) {
-          if (!pending[i].executed) {
-            pending[i].executed = true;
-            return exec(pending[i].values);
-          }
-
-          i += 1;
-        }
-      });
-    };
-
-    // pending is an update queue
-    let pending = instance[pendingUpdate],
-      i = 0;
-
-    if (!pending) {
-      pending = instance[pendingUpdate] = [{
-        values,
-        "executed": true,
-        "onUpdate": []
-      }];
-
-      exec(values);
-    } else {
-      // every consequent update will either be joined with a running update
-      // or queued and ran by the exec function when the previous is complete
-
-      // first find the update that is either:
-      //  the last update
-      //  the currently running update
-      while (
-        i < pending.length - 1 &&
-          pending[i + 1].executed === false
-      ) {
-        i += 1;
-      }
-
-      let runningUpdate = pending[i],
-        unresolvedUpdate = this[diff](runningUpdate.values, values);
-
-      // Calculate if a second update is needed
-
-      for (let key of Object.keys(values)) {
-        if (
-          !runningUpdate.values.hasOwnProperty(key) ||
-            runningUpdate.values[key] !== values[key]
-        ) {
-          unresolvedUpdate[key] = values[key];
-        }
-      }
-
-      // If we need to jump onto the next one
-      if (Object.keys(unresolvedUpdate).length) {
-        i += 1;
-
-        if (pending[i]) {
-          Object.assign(pending[i].values, unresolvedUpdate);
+        if (diffToInstance) {
+          Object.assign(instance, diffToInstance);
+          super.update(instance, diffToInstance);
         } else {
-          pending.push({
-            "values": unresolvedUpdate,
-            "executed": false,
-            "onUpdate": []
+          this.add(instance);
+        }
+
+        delete instance[pendingUpdate];
+
+        if (updateQueue.nextUpdate) {
+          this.update(instance, updateQueue.nextUpdate, () => {
+            updateQueue.nextOnUpdate.forEach(cb => cb());
           });
         }
-      }
-    }
 
-    return wrap.transform(callback, (result, resolve) => {
-      pending[i].onUpdate.push(resolve);
+        updateQueue.onUpdate.forEach(cb => cb());
+      });
     });
   }
 
-  [updateAcknowledge](before, after) {
-    // If we don't persist instances
-    if (!this[storage]) {
-      if (!this.options.allEvents) {
-        return;
-      }
-
-      return new this.Class(after)
-        .emit("update", this[diff](before, after));
-    }
-
-    const keyString = this.buildKey(before);
-
-    let instance = this[storage][keyString];
-
-    // If we've never seen the instance before
-    if (!instance) {
-      if (!this.options.allEvents) {
-        return;
-      }
-
-      instance = new this.Class(after);
-      this.add(instance);
-
-      return instance.emit("update", this[diff](before, after));
-    }
-
-    let diffToInstance = this[diff](instance, after),
-      changes = this[diff](before, after),
-      pending = instance[pendingUpdate];
-
-    if (diffToInstance) {
-      Object.assign(instance, diffToInstance);
-      super.update(instance, diffToInstance);
-    } else {
-      this.add(instance, keyString);
-    }
-
-    if (pending) {
-      let {values, onUpdate} = pending[0];
-
-      if (this[diff](changes, values)) {
-        log.warn("External update between exec, onUpdate", {
-          values,
-          before,
-          after,
-          instance,
-          changes
-        });
-      } else {
-        pending.shift();
-
-        if (pending.length === 0) {
-          delete instance[pendingUpdate];
-        }
-
-        onUpdate.forEach(resolve => resolve(values));
-      }
-    }
-
-    instance.emit("update", changes);
-  }
 
   delete(instance, callback) {
     const {database, name} = this.options,
@@ -538,14 +455,6 @@ class MysqlRegistry extends Registry {
       DELETE FROM ??.??
       WHERE ?
     `, [database, name, currentPK]));
-  }
-
-  [deleteAcknowledge](row) {
-    const instance = this.rowToInstance(row, row, this.options.allEvents);
-
-    super.delete(instance);
-
-    instance.emit("delete", instance);
   }
 
   rowToInstance(row, update = row, instaniate = true) {

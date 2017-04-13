@@ -256,6 +256,10 @@ BinLog.prototype.tableMap = function (packet) {
   });
 };
 
+BinLog.prototype.query = function () {
+  this.binLogManager.handleStatementReplication();
+};
+
 BinLog.prototype.update = function (packet) {
   const {parser, tableId} = packet,
     {map, columns} = this.binLogManager.getInfo(tableId);
