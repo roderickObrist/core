@@ -10,7 +10,7 @@ exports.is = require('./is');
 try {
   exports.config = require(path.join(dir, 'config'));
 } catch (e) {
-  if (!e.message.startsWith("Cannot find module '../../config'")) {
+  if (!e.message.startsWith(`Cannot find module '${path.join(dir, 'config')}'`)) {
     throw e;
   }
 
