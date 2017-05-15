@@ -41,7 +41,7 @@ class RAMRegistry extends Registry {
       instance = null;
     }
 
-    return wrap.transform(callback, (result, resolve) => resolve(instance));
+    return wrap.transform(callback, (result, resolve) => resolve([instance]));
   }
 
   create(query, callback) {
