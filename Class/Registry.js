@@ -75,7 +75,7 @@ class Registry extends EventEmitter {
     }
 
     if (Date.now() - instance[timestamp] < this.options.cacheAge) {
-      return instance[timestamp];
+      return instance;
     }
 
     // We have it but it's old

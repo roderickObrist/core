@@ -84,15 +84,15 @@ class RAMRegistry extends Registry {
     const keys = Object.keys(newObject)
       .filter(key => {
         if (!instance.hasOwnProperty(key)) {
-          return false;
+          return true;
         }
 
         if (newObject[key] instanceof Date) {
           return instance[key] instanceof Date &&
-            newObject[key].getTime() === instance[key].getTime();
+            newObject[key].getTime() !== instance[key].getTime();
         }
 
-        return instance[key] === newObject[key];
+        return instance[key] !== newObject[key];
       });
 
     if (keys.length === 0) {
