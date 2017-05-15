@@ -79,6 +79,22 @@ class RAMRegistry extends Registry {
 
     return wrap.transform(callback, (result, resolve) => resolve());
   }
+
+  [diff](instance, newObject) {
+    return Object.keys(newObject)
+      .any(key => {
+        if (!instance.hasOwnProperty(key)) {
+          return false;
+        }
+
+        if (newObject[key] instanceof Date) {
+          return instance[key] instanceof Date &&
+            newObject[key].getTime() === instance[key].getTime();
+        }
+
+        return instance[key] === newObject[key];
+      });
+  }
 }
 
 module.exports = RAMRegistry;
