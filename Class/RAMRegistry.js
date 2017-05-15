@@ -81,8 +81,8 @@ class RAMRegistry extends Registry {
   }
 
   [diff](instance, newObject) {
-    return Object.keys(newObject)
-      .any(key => {
+    const keys = Object.keys(newObject)
+      .filter(key => {
         if (!instance.hasOwnProperty(key)) {
           return false;
         }
@@ -94,6 +94,16 @@ class RAMRegistry extends Registry {
 
         return instance[key] === newObject[key];
       });
+
+    if (keys.length === 0) {
+      return false;
+    }
+
+    let diff = {};
+
+    keys.forEach(key => diff[key] = newObject[key]);
+
+    return diff;
   }
 }
 

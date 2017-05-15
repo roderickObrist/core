@@ -254,13 +254,9 @@ class MysqlRegistry extends Registry {
       `;
 
     if (instance) {
-      throw new Error("Caching querys is not implemented yet");
-//      let goodEnough = Object.keys(query)
-//        .every(key => instance[key] === query[key]);
-//
-//      if (goodEnough) {
-//        throw new Error("Caching querys is not implemented yet");
-//      }
+      if (!this[diff](instance, query)) {
+        return wrap.transform(callback, (result, resolve) => resolve([instance]));
+      }
     }
 
     if (query[order]) {
