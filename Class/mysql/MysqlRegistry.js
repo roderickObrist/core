@@ -340,7 +340,7 @@ class MysqlRegistry extends Registry {
           updateQueue.nextOnUpdate = [];
         }
 
-        Object.assign(updateQueue.nextUpdate, diff);
+        Object.assign(updateQueue.nextUpdate, unresolvedUpdate);
 
         return wrap.transform(callback, (result, resolve) => {
           updateQueue.nextOnUpdate.push(resolve);
@@ -379,7 +379,10 @@ class MysqlRegistry extends Registry {
       currentPK
     ], (e, result) => {
       if (e) {
-        return log.error(e);
+        return log.error(e, {
+          "query": e.query,
+          "param": e.param
+        });
       }
 
       if (result.affectedRows !== 1) {
