@@ -1,7 +1,10 @@
 "use strict";
 
-const {is, log, S} = require('./'),
-  {addBinding, listeners, parse, emit} = S;
+const {is, log} = require("./"),
+  addBinding = Symbol.for("addBinding"),
+  listeners = Symbol.for("listeners"),
+  parse = Symbol.for("parse"),
+  emit = Symbol.for("emit");
 
 module.exports = class EventEmitter {
   constructor() {
@@ -14,8 +17,9 @@ module.exports = class EventEmitter {
   // 'namespace.eventName otherEvent[4]'
   [parse](name, listener, forEach, needsFunc = true) {
     if (is.baseObject(name)) {
-      Object.keys(name)
-        .forEach(name => this[parse](name, listener, forEach, needsFunc));
+      for (const key of Object.keys(name)) {
+        this[parse](key, listener, forEach, needsFunc);
+      }
 
       return this;
     }
@@ -28,26 +32,26 @@ module.exports = class EventEmitter {
       needsFunc &&
         !is.func(listener)
     ) {
-      return log.error("listener must be a string");
+      return log.error("listener must be a function");
     }
 
-    name.split(' ')
-      .map(eventDescriptor => {
-        let n = /\[([0-9]+)\]$/.exec(eventDescriptor),
-          id = eventDescriptor;
+    for (const eventDescriptor of name.split(" ")) {
+      let n = /\[([0-9]+)\]$/.exec(eventDescriptor),
+        id = eventDescriptor;
 
-        if (n) {
-          id = id.slice(0, -n[0].length);
-          n = Number(n[1]);
-        } else {
-          n = 0;
-        }
+      if (n) {
+        id = id.slice(0, -n[0].length);
+        n = Number(n[1]);
+      } else {
+        n = 0;
+      }
 
-        return {
-          id, n, listener
-        };
-      })
-      .forEach(forEach);
+      forEach({
+        id,
+        listener,
+        n
+      });
+    }
 
     return this;
   }
@@ -57,10 +61,10 @@ module.exports = class EventEmitter {
       this.describe(binding.id);
     }
 
-    if (binding.id !== 'new.listener') {
-      this.emit('new.listener', {
-        "name": binding.id,
-        "listener": binding.listener
+    if (binding.id !== "new.listener") {
+      this.emit("new.listener", {
+        "listener": binding.listener,
+        "name": binding.id
       });
     }
 
@@ -84,13 +88,16 @@ module.exports = class EventEmitter {
   }
 
   off(name, listener) {
-    return this[parse](name, listener, (id, listener) => {
-      let l = this[listeners][id];
+    return this[parse](name, listener, (id, listenerFunc) => {
+      const container = this[listeners][id];
 
-      if (l) {
-        for (let i = 0; i < l.bindings.length; i += 1) {
-          if (l.bindings[i].listener === listener) {
-            return l.bindings.splice(i, 1);
+      if (container) {
+        const {bindings} = container;
+
+        for (let i = 0; i < bindings.length; i += 1) {
+          if (bindings[i].listener === listenerFunc) {
+            bindings.splice(i, 1);
+            return;
           }
         }
       }
@@ -103,7 +110,7 @@ module.exports = class EventEmitter {
 
   emit(name, argument, eventContext = {}) {
     return this[parse](name, argument, ({id, listener}) => {
-      let metaArg = {
+      const metaArg = {
         "event": id,
         "target": eventContext.target || this
       };
@@ -113,25 +120,25 @@ module.exports = class EventEmitter {
         this.describe(id);
       }
 
-      while (id.length) {
-        this[emit](id, listener, metaArg);
+      let runningEventName = id;
 
-        id = id.split('.')
-          .slice(0, -1)
-          .join('.');
-      }
+      do {
+        this[emit](runningEventName, listener, metaArg);
+        runningEventName = runningEventName.replace(/(\.|^)[^.]+$/, "");
+      } while (id.length);
     }, false);
   }
 
   [emit](id, argument, eventContext) {
-    let container = this[listeners][id];
+    const container = this[listeners][id];
+
+    if (!container) {
+      return;
+    }
 
     if (
-      !container ||
-        (
-          container.fireOnce &&
-            container.n
-        )
+      container.fireOnce &&
+        container.n
     ) {
       return;
     }
@@ -141,19 +148,19 @@ module.exports = class EventEmitter {
     // If .off() is called during .emit() results can be unstable; i is incremented,
     // bindings.length drops. This is fixed by copying the handlers array and checking
     // if the function is still in the original array before invokation
-    let bindings = container.bindings.slice(0);
+    const bindings = container.bindings.slice(0);
 
-    for (let i = 0; i < bindings.length; i += 1) {
-      if (container.bindings.indexOf(bindings[i]) !== -1) {
-        bindings[i].listener.call(this, argument, eventContext);
+    for (const binding of bindings) {
+      if (container.bindings.includes(binding)) {
+        binding.listener.call(this, argument, eventContext);
       }
     }
   }
 
   describe(bindingId, config = {}) {
     this[listeners][bindingId] = {
-      "fireOnce": Boolean(config.fireOnce),
       "bindings": [],
+      "fireOnce": Boolean(config.fireOnce),
       "n": 0
     };
 
@@ -161,6 +168,6 @@ module.exports = class EventEmitter {
       return this;
     }
 
-    return this.emit('new.event', bindingId);
+    return this.emit("new.event", bindingId);
   }
 };

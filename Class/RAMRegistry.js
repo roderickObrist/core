@@ -1,22 +1,18 @@
 "use strict";
 
-const {wrap, S, is} = require('../index'),
-  {
-    diff,
-    storage
-  } = S,
-  Registry = require('./Registry');
+const {log, is} = require("../index"),
+  diff = Symbol.for("diff"),
+  storage = Symbol.for("storage"),
+  timestamp = Symbol.for("timestamp"),
+  Registry = require("./Registry");
 
-class RAMRegistry extends Registry {
+module.exports = class RAMRegistry extends Registry {
   constructor(options, Class) {
-
-    // Massage options
-    options = Object.assign({
+    // Massage options, it makes no sense to have a non persistent RAMRegistry
+    super(Object.assign({
       "cacheAge": Infinity,
       "persistent": true
-    }, options);
-
-    super(options, Class);
+    }, options), Class);
 
     this.keys = {
       "PRIMARY": this.options.keys.map(key => ({
@@ -25,32 +21,31 @@ class RAMRegistry extends Registry {
     };
   }
 
-  get(query, callback) {
+  async get(query) {
     if (query === null) {
-      return wrap.transform(callback, (result, resolve) => {
-        Object.keys(this[storage])
-          .forEach(key => result(this[storage][key]));
-
-        resolve();
-      });
+      log.warn(".get() called with null retrieves all");
+      return Object.values(this[storage]);
     }
 
-    let instance = super.get(query);
+    const primaryKey = super.buildKey(query);
 
-    if (this[diff](instance, query)) {
-      instance = null;
+    if (primaryKey) {
+      const instance = this[storage][primaryKey];
+
+      return instance &&
+          Date.now() - instance[timestamp] < this.options.cacheAge &&
+          !this[diff](instance, query)
+        ? [instance]
+        : [];
     }
 
-    return wrap.transform(callback, (result, resolve) => resolve(instance));
+    return Object.values(this[storage])
+      .filter(instance => !this[diff](instance, query));
   }
 
-  create(query, callback) {
-    if (!this[storage]) {
-      return new this.Class(query);
-    }
-
+  async create(query) {
     if (is.array(query)) {
-      throw new Error("Create with array is not implemented yet");
+      return log.error(".create([array]) is not supported yet");
     }
 
     const key = this.buildKey(query);
@@ -65,20 +60,20 @@ class RAMRegistry extends Registry {
 
     instance.emit("create", instance);
 
-    return wrap.transform(callback, (result, resolve) => resolve(instance));
+    return instance;
   }
 
-  update(instance, values, callback) {
+  async update(instance, values) {
     super.update(instance, values);
 
-    return wrap.transform(callback, (result, resolve) => resolve());
+    Object.assign(instance, values);
   }
 
-  delete(instance, callback) {
+  async delete(instance) {
     super.delete(instance);
-
-    return wrap.transform(callback, (result, resolve) => resolve());
   }
-}
 
-module.exports = RAMRegistry;
+  [diff](instance, query) {
+    throw "TODO";
+  }
+};

@@ -1,117 +1,113 @@
 "use strict";
 
-const {log, wrap, S} = require("../index");
+const {log} = require("../index"),
+  registry = Symbol.for("registry");
 
 function ns(regOrKey) {
   if (regOrKey.COLUMN_NAME) {
-    return regOrKey.REFERENCED_TABLE_SCHEMA + '.' + regOrKey.REFERENCED_TABLE_NAME;
+    return `${regOrKey.REFERENCED_TABLE_SCHEMA}.${regOrKey.REFERENCED_TABLE_NAME}`;
   }
 
-  return regOrKey.options.database + '.' + regOrKey.options.name;
+  return `${regOrKey.options.database}.${regOrKey.options.name}`;
 }
 
 module.exports = class Join {
   constructor(Base) {
     this.Base = Base;
     this.joins = [];
-    this.foreignKeys = {};
 
     this.join(Base, "FK");
   }
 
   join(Class, relationship) {
-    let join = {Class, relationship},
-      registry = Class[S.registry];
+    const join = {
+        Class,
+        relationship
+      },
+      classRegistry = Class[registry];
 
     if (!relationship) {
       join.relationship = "FK";
     }
 
-    if (!registry) {
+    if (!classRegistry) {
       return log.error("Trying to join with no relationship/registry");
     }
 
-    if (registry.keys) {
-      this.analyseKeys(registry);
-      this.joins.push(join);
-    } else {
-      this.joins.push(new Promise((resolve) => {
-        registry.on("ready", () => {
-          this.analyseKeys(registry);
-          resolve(join);
-        });
-      }));
-    }
+    this.joins.push(join);
 
     return this;
   }
 
-  get(...args) {
-    let callback = args.pop(),
-      where = args[0];
+  async get(where) {
+    if (!this.foreignKeys) {
+      this.foreignKeys = {};
 
-    return Promise.all(this.joins).then(value => {
-      let sql = this.buildSql(value);
+      for (const join of this.joins) {
+        const joinRegistry = join.Class[registry];
 
-      if (where) {
-        sql.sql += " WHERE ?";
-        sql.param.push(where);
+        if (!joinRegistry.keys) {
+          await new Promise(resolve => joinRegistry.on("ready", resolve));
+        }
+
+        this.analyseKeys(joinRegistry);
       }
+    }
 
-      return wrap(
-        callback,
-        this.Base[S.registry].db.bind(null, {
-          "sql": sql.sql,
-          "nestTables": true
-        }, sql.param),
-        row => {
-          const val = {};
+    const sql = this.buildSql();
 
-          value.forEach(join => {
-            const reg = join.Class[S.registry],
-              name = reg.options.name;
+    if (where) {
+      sql.sql += " WHERE ?";
+      sql.param.push(where);
+    }
 
-            val[name] = reg.rowToInstance(row[reg.options.name]);
-          });
+    const rows = await this.Base[registry].db({
+      "nestTables": true,
+      "sql": sql.sql
+    }, sql.param);
 
-          return val;
-        },
-        true
-      );
+    return rows.map(row => {
+      const val = {};
+
+      this.joins.forEach(join => {
+        const joinRegistry = join.Class[registry],
+          {name} = joinRegistry.options;
+
+        val[name] = joinRegistry.rowToInstance(row[name]);
+      });
+
+      return val;
     });
   }
 
-  analyseKeys(registry) {
-    const foreignKeys = this.foreignKeys,
-      from = ns(registry),
-      keys = registry.keys;
+  analyseKeys(reg) {
+    const {foreignKeys} = this,
+      from = ns(reg);
 
     function merge(a, b) {
       const merged = {};
 
-      a.forEach((key, i) => merged[key] = b[i]);
+      a.forEach((key, i) => {
+        merged[key] = b[i];
+      });
 
       return merged;
     }
 
-    function add(from, to, fromKeys, toKeys) {
-      let key = from + '-' + to,
-        container = foreignKeys[key];
+    function add(a, b, aKeys, bKeys) {
+      const key = `${a}-${b}`;
 
-      if (!container) {
-        container = foreignKeys[key] = [];
+      if (!foreignKeys[key]) {
+        foreignKeys[key] = [];
       }
 
-      foreignKeys[key].push(merge(fromKeys, toKeys));
+      foreignKeys[key].push(merge(aKeys, bKeys));
     }
 
-    for (let key in keys) {
-      if (
-        keys.hasOwnProperty(key) &&
-          keys[key][0].REFERENCED_TABLE_SCHEMA
-      ) {
-        const keyArray = keys[key],
-          to = ns(keyArray[0]),
+    for (const keyArray of Object.values(reg.keys)) {
+      // If it's a foriegn key
+      if (keyArray[0].REFERENCED_TABLE_SCHEMA) {
+        const to = ns(keyArray[0]),
           toKeys = keyArray.map(key => key.REFERENCED_COLUMN_NAME),
           fromKeys = keyArray.map(key => key.COLUMN_NAME);
 
@@ -121,7 +117,7 @@ module.exports = class Join {
     }
   }
 
-  buildSql(joins) {
+  buildSql() {
     // {
     //   "PERMACONN.Device-PERMACONN.ControlRoom": [
     //     {
@@ -159,70 +155,73 @@ module.exports = class Join {
     //   ]
     // }
 
-    const dbName = this.Base[S.registry].options.database,
-      baseName = this.Base[S.registry].options.name,
+    const {joins} = this,
+      {database, name} = this.Base[registry].options,
       innerJoins = joins.slice(1),
       SELECT = {
-        "sql": "SELECT ??.??.*",
-        "param": [dbName, baseName]
+        "param": [database, name],
+        "sql": "SELECT ??.??.*"
       },
       FROM = {
-        "sql": "FROM ??.??",
-        "param": [dbName, baseName]
+        "param": [database, name],
+        "sql": "FROM ??.??"
       };
 
     while (innerJoins.length) {
-      let join = innerJoins.shift(),
-        registry = join.Class[S.registry],
-        relationshipKeys,
-        relationship;
+      const ij = innerJoins.shift(),
+        ijReg = ij.Class[registry];
 
-      if (join.relationship === "FK") {
-        relationship = this.findJoin(registry, joins);
-      } else {
-        relationship = join.relationship;
+      let {relationship} = ij;
+
+      if (ij.relationship === "FK") {
+        relationship = this.findJoin(ijReg);
       }
 
       if (!relationship) {
-        throw "FAIL";
+        return log.error("Unable to find suitable forign key for join()", {
+          "available": this.foreignKeys,
+          "issue": ij
+        });
       }
 
-      relationshipKeys = Object.keys(relationship);
+      const relationshipKeys = Object.keys(relationship);
 
-      SELECT.sql += ', ??.??.*';
-      SELECT.param.push(registry.options.database, registry.options.name);
+      SELECT.sql += ", ??.??.*";
+      SELECT.param.push(ijReg.options.database, ijReg.options.name);
 
-      FROM.sql += ' INNER JOIN ??.??';
-      FROM.param.push(registry.options.database, registry.options.name);
+      FROM.sql += " INNER JOIN ??.??";
+      FROM.param.push(ijReg.options.database, ijReg.options.name);
 
       if (relationshipKeys.every(key => relationship[key] === key)) {
         FROM.sql += " USING(";
 
         relationshipKeys.forEach((key, i) => {
           if (i) {
-            FROM.sql += ', ';
+            FROM.sql += ", ";
           }
 
-          FROM.sql += '??';
+          FROM.sql += "??";
           FROM.param.push(key);
         });
 
         FROM.sql += ")";
+      } else {
+        return log.error("HOW TO HANDLE THIS?");
       }
     }
 
     return {
-      "sql": SELECT.sql + " " + FROM.sql,
-      "param": SELECT.param.concat(FROM.param)
+      "param": SELECT.param.concat(FROM.param),
+      "sql": `${SELECT.sql} ${FROM.sql}`
     };
   }
 
-  findJoin(registry, joins) {
-    const classKey = ns(registry),
+  findJoin(ijReg) {
+    const classKey = ns(ijReg),
       possibilites = [];
 
-    for (let join of joins) {
-      let key = classKey + '-' + ns(join.Class[S.registry]);
+    for (const join of this.joins) {
+      const key = `${classKey}-${ns(join.Class[registry])}`;
 
       if (
         this.foreignKeys[key] &&

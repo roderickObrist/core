@@ -1,14 +1,13 @@
+/* eslint global-require: 0 */
 "use strict";
 
 const path = require("path"),
   dir = path.dirname(process.mainModule.filename);
 
-exports.S = require('./S');
-
-exports.is = require('./is');
+exports.is = require("./is");
 
 try {
-  exports.config = require(path.join(dir, 'config'));
+  exports.config = require(path.join(dir, "config"));
 } catch (e) {
   if (!e.message.startsWith("Cannot find module ")) {
     throw e;
@@ -16,25 +15,25 @@ try {
 
   exports.config = {};
 }
-console.log(exports.config);
+
 if (!exports.config.dir) {
   exports.config.dir = dir;
 }
 
-exports.log = require('./log');
+exports.log = require("./log");
 
-exports.db = require('./db');
+exports.db = require("./db");
 
 exports.m = require("moment");
 
-exports.EventEmitter = require('./EventEmitter');
+exports.EventEmitter = require("./EventEmitter");
 
-exports.Class = require('./Class');
+// exports.Class = require('./Class');
 
-//exports.Command = require("./Command");
+// exports.Command = require("./Command");
 
 function onErr(err) {
-  let details = {"path": "uncaughtException"};
+  const details = {"path": "uncaughtException"};
 
   if (!(err instanceof Error)) {
     details.body = {
@@ -45,5 +44,5 @@ function onErr(err) {
   exports.log.error(details, err);
 }
 
-process.on('unhandledRejection', onErr)
-  .on('uncaughtException', onErr);
+process.on("unhandledRejection", onErr)
+  .on("uncaughtException", onErr);

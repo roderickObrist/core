@@ -9,3 +9,12 @@ There should be some sort of guide for
 1. config files
 2. command line "nc localhost 8000"
 3. rethinkdb (which I am rethinking)
+
+
+CORE 2
+1) use async keyword only
+  no callback style any more
+  delete wrap.js
+  Class.getStream for stream style
+2) use Symbol.for, no more S.js
+3) What to do about module loading? (keep it the same or ??)

@@ -1,32 +1,33 @@
+/* eslint class-methods-use-this: 0 */
 "use strict";
 
-const {wrap} = require('../index');
+const {is, log} = require("../");
 
 module.exports = class GetSignature {
-  constructor(details, Class, registrySymbol) {
+  constructor(details, Class) {
     this.Class = Class;
-    this.r = registrySymbol;
 
-    for (let func of ["get", "test", "map"]) {
-      if (details[func]) {
-        this[func] = details[func];
-      }
+    if (!is.func(details.get)) {
+      return log.error("GetSignature must have a get()");
+    }
+
+    this.get = details.get;
+
+    if (is.func(details.test)) {
+      this.test = details.test;
+    }
+
+    // Figure this one out soon
+    if (is.func(details.map)) {
+      this.map = details.map;
     }
   }
 
-  test(query) {
-    return Boolean(query);
+  test() {
+    return true;
   }
 
-  exec(query, callback) {
-    if (this.get) {
-      return wrap.transform(callback, (result, resolve, reject) => {
-        this.get(query, {
-          result, resolve, reject,
-          "registry": this.Class[this.r]
-        });
-      });
-    }
+  async exec(query) {
+    return this.get(query);
   }
 };
-

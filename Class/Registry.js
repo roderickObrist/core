@@ -59,6 +59,7 @@ class Registry extends EventEmitter {
   }
 
   get(query) {
+    throw "this should not exist";
     if (!this[storage]) {
       return false;
     }

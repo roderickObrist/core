@@ -2,20 +2,16 @@
 
 "use strict";
 
-const {EventEmitter, S, log} = require("../index"),
+const {EventEmitter, log} = require("../index"),
+  getEventEmitter = Symbol.for("getEventEmitter"),
+  getSignatures = Symbol.for("getSignatures"),
+  configureSet = Symbol.for("configureSet"),
   GetSignature = require("./GetSignature"),
-  Join = require("./Join"),
   RAMRegistry = require("./RAMRegistry"),
-  {
-    getEventEmitter,
-    getSignatures,
-    registry,
-    configureSet,
-    ee,
-    diff,
-    order,
-    limit
-  } = S;
+  registry = Symbol.for("registry"),
+  diff = Symbol.for("diff"),
+  Join = require("./Join"),
+  ee = Symbol.for("ee");
 
 // Lazy load MysqlRegistry because some of that code requires Class
 let MysqlRegistry = (...args) => {
@@ -68,7 +64,7 @@ class Class extends EventEmitter {
         this[getSignatures] = [];
       }
 
-      this[getSignatures].push(new GetSignature(options, this, registry));
+      this[getSignatures].push(new GetSignature(options, this));
     } else {
       log.error("Unknown configure option", {
         name,
@@ -133,7 +129,7 @@ class Class extends EventEmitter {
     this[registry].clean();
   }
 
-  static get(...args) {
+  static async get(...args) {
     if (this[getSignatures]) {
       for (const getSignature of this[getSignatures]) {
         if (getSignature.test(args[0])) {
@@ -145,14 +141,14 @@ class Class extends EventEmitter {
     return this[registry].get(...args);
   }
 
-  static create(query) {
+  static async create(query) {
     const r = this[registry];
 
-    if (r) {
-      return r.create(query);
+    if (!r) {
+      return log.error("Cannot call create() without registry");
     }
 
-    throw new Error("no reg");
+    return r.create(query);
   }
 
   static join(ClassToJoin, relationship) {
@@ -173,37 +169,33 @@ class Class extends EventEmitter {
       .emit(name, data, {"target": this});
   }
 
-  delete() {
+  async delete() {
+    const r = this.constructor[registry];
+
+    if (!r) {
+      return log.error("Cannot call delete() without registry");
+    }
+
     this.emit("delete");
 
-    if (this[registry]) {
-      return this.constructor[registry].delete(this);
-    }
-
-    return new Promise(resolve => resolve(this));
+    return r.delete(this);
   }
 
-  update(values) {
-    const ThisClass = this.constructor;
+  async update(values) {
+    const r = this.constructor[registry];
 
-    if (!ThisClass[registry]) {
-      return log.error("Update Class has no registry", {
-        "className": ThisClass.name
-      });
+    if (!r) {
+      return log.error("Cannot call update() without registry");
     }
 
-    const actualUpdate = ThisClass[registry][diff](this, values, true);
+    const actualUpdate = r[diff](this, values, true);
 
     if (actualUpdate) {
-      return ThisClass[registry].update(this, actualUpdate);
+      return r.update(this, actualUpdate);
     }
 
-    return new Promise(resolve => resolve(this));
+    return false;
   }
 }
-
-Class.get.order = order;
-
-Class.get.limit = limit;
 
 module.exports = Class;
