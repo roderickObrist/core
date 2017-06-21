@@ -64,9 +64,9 @@ module.exports = class RAMRegistry extends Registry {
   }
 
   async update(instance, values) {
-    super.update(instance, values);
-
     Object.assign(instance, values);
+
+    super.update(instance, values);
   }
 
   async delete(instance) {

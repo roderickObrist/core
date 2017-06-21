@@ -188,7 +188,7 @@ class Class extends EventEmitter {
       return log.error("Cannot call update() without registry");
     }
 
-    const actualUpdate = r[diff](this, values, true);
+    const actualUpdate = r[diff](this, values);
 
     if (actualUpdate) {
       return r.update(this, actualUpdate);
