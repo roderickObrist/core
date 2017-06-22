@@ -13,7 +13,6 @@ const types = require("mysql/lib/protocol/constants/types"),
 class MysqlRegistry extends Registry {
   constructor(options, Class) {
     const dbOptions = ["database", "host", "user", "password"],
-      needsToBeReady = ["get", "update", "delete", "create"],
       needsOwnDbObject = dbOptions.some(key =>
         options.hasOwnProperty(key) && options[key] !== db.poolConfig[key]);
 
@@ -28,15 +27,6 @@ class MysqlRegistry extends Registry {
       "persistent": true
     }, options), Class);
 
-    // Overwrite async functions that need db connectivity
-    needsToBeReady.forEach(func => {
-      this[func] = (...args) => {
-        this.on("ready", () => {
-          this[func](...args);
-        });
-      };
-    });
-
     this.db = db;
 
     if (needsOwnDbObject) {
@@ -49,21 +39,20 @@ class MysqlRegistry extends Registry {
       this.db = this.db.setPool(newOptions);
     }
 
-    this.refreshSchema()
-      .then(async () => {
-        if (this.options.binLog) {
-          throw log.error("binLog support not ready yet");
-          // const binLogManager = await BinLogManager.create({
-          //   "host": options.host
-          // });
+    this.schema = this.refreshSchema();
 
-          // binLogManager.add(this);
-        }
+    this.schema.then(async () => {
+      if (this.options.binLog) {
+        throw log.error("binLog support not ready yet");
+        // const binLogManager = await BinLogManager.create({
+        //   "host": options.host
+        // });
 
-        needsToBeReady.forEach(func => delete this[func]);
+        // binLogManager.add(this);
+      }
 
-        this.emit("ready");
-      });
+      this.emit("ready");
+    });
   }
 
   async refreshSchema() {
@@ -223,6 +212,7 @@ class MysqlRegistry extends Registry {
       case types.TIMESTAMP:
       case types.DATETIME2:
       case types.TIMESTAMP2:
+      case types.VAR_STRING:
         break;
 
       case types.DOUBLE:
@@ -254,7 +244,31 @@ class MysqlRegistry extends Registry {
     });
   }
 
+  sql(query) {
+    let sql = `
+        SELECT *
+        FROM ??.??
+        WHERE ?
+      `;
+
+    const where = Object.assign({}, query);
+
+    if (query[order]) {
+      sql += ` ORDER BY ${query[order]}`;
+      delete where[order];
+    }
+
+    if (query[limit]) {
+      sql += ` LIMIT ${query[limit]}`;
+      delete where[limit];
+    }
+
+    return [sql, [this.options.database, this.options.name, where]];
+  }
+
   async get(query) {
+    await this.schema;
+
     if (this[storage]) {
       const primaryKey = super.buildKey(query);
 
@@ -272,26 +286,18 @@ class MysqlRegistry extends Registry {
       }
     }
 
-    let sql = `
-        SELECT *
-        FROM ??.??
-        WHERE ?
-      `;
-
-    if (query[order]) {
-      sql += ` ORDER BY ${query[order]}`;
-    }
-
-    if (query[limit]) {
-      sql += ` LIMIT ${query[limit]}`;
-    }
-
-    const rows = await this.db(sql, [this.options.database, this.options.name, query]);
+    const rows = await this.db(...this.sql(query));
 
     return rows.map(row => this.rowToInstance(row));
   }
 
+  getStream(query) {
+    return this.db.stream(...this.sql(query));
+  }
+
   async create(query) {
+    await this.schema;
+
     if (is.array(query)) {
       throw this.error("Create with array is not implemented yet");
     }
@@ -352,6 +358,8 @@ class MysqlRegistry extends Registry {
   }
 
   async update(instance, values) {
+    await this.schema;
+
     /* eslint consistent-return: 0 */
 
     if (this.options.binLog) {
@@ -457,6 +465,8 @@ class MysqlRegistry extends Registry {
   }
 
   async delete(instance) {
+    await this.schema;
+
     const {database, name} = this.options,
       currentPK = {};
 

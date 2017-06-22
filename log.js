@@ -113,9 +113,14 @@ function formatMultipleArgs(message, extra, level) {
     errorObject = new Error();
   }
 
-  if (!data.body.stack) {
-    data.body.stack = errorObject.stack;
-  }
+  ["stack", "query", "param"].forEach(key => {
+    if (
+      !data.body[key] &&
+        errorObject[key]
+    ) {
+      data.body[key] = errorObject[key];
+    }
+  });
 
   try {
     data.body.stack = data.body.stack.split('\n')
@@ -141,7 +146,7 @@ function formatMultipleArgs(message, extra, level) {
 
   stamp(data, level);
 
-  return data;
+  return [data, errorObject];
 }
 
 exports.info = (data, stringified) => {
@@ -203,7 +208,7 @@ exports.info = (data, stringified) => {
 };
 
 exports.warn = (message, extra) => {
-  let data = formatMultipleArgs(message, extra, 'warn');
+  let [data] = formatMultipleArgs(message, extra, 'warn');
 
   store(data);
 
@@ -215,15 +220,17 @@ exports.warn = (message, extra) => {
 };
 
 exports.error = (message, extra) => {
-  let data = formatMultipleArgs(message, extra, 'error');
+  let [data, errorObject] = formatMultipleArgs(message, extra, 'error');
 
   store(data);
 
   if (!canHandleColors) {
-    return console.error(`${data.body.code} ${JSON.stringify(data.body, '', 2)}`);
+    console.error(`${data.body.code} ${JSON.stringify(data.body, '', 2)}`);
+  } else {
+    console.log(`${data.body.code.bold.red} ${JSON.stringify(data.body, '', 2)}`);
   }
 
-  console.log(`${data.body.code.bold.red} ${JSON.stringify(data.body, '', 2)}`);
+  return errorObject;
 };
 
 exports.session = (details, stringified) => {

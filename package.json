@@ -7,12 +7,12 @@
   "license": "UNLICENSED",
   "main": "index.js",
   "dependencies": {
-    "mysql": "^2.10.2",
-    "rethinkdb": "^2.3.3",
+    "colors": "^1.1.2",
+    "fs-extra": "^3.0.1",
     "moment": "^2.16.0",
-    "colors": "^1.1.2"
+    "mysql": "^2.10.2",
+    "rethinkdb": "^2.3.3"
   },
-
   "eslintConfig": {
     "parserOptions": {
       "ecmaVersion": 8
@@ -57,22 +57,28 @@
       "func-style": 0,
       "require-jsdoc": 0,
       "max-params": [
-        "error", {
+        "error",
+        {
           "max": 5
         }
       ],
       "max-len": [
-        "error", 
+        "error",
         150
       ],
       "wrap-regex": 0,
       "require-await": 0,
       "array-element-newline": [
-        "error", {
+        "error",
+        {
           "minItems": 5
         }
       ],
-      "no-await-in-loop": 0
+      "no-await-in-loop": 0,
+      "consistent-this": [
+        "error",
+        "self"
+      ]
     }
   }
 }

@@ -1,4 +1,4 @@
-/* eslint global-require: 0 */
+/* eslint global-require: 0 init-declarations: 0 */
 
 "use strict";
 
@@ -9,16 +9,13 @@ const {EventEmitter, log} = require("../index"),
   GetSignature = require("./GetSignature"),
   RAMRegistry = require("./RAMRegistry"),
   registry = Symbol.for("registry"),
+  {Transform} = require("stream"),
   diff = Symbol.for("diff"),
   Join = require("./Join"),
   ee = Symbol.for("ee");
 
 // Lazy load MysqlRegistry because some of that code requires Class
-let MysqlRegistry = (...args) => {
-  MysqlRegistry = require("./mysql/MysqlRegistry");
-
-  return new MysqlRegistry(...args);
-};
+let MysqlRegistry;
 
 class Class extends EventEmitter {
   static [getEventEmitter]() {
@@ -54,6 +51,10 @@ class Class extends EventEmitter {
 
   static configure(name, options = {}) {
     if (name === "db") {
+      if (!MysqlRegistry) {
+        MysqlRegistry = require("./mysql/MysqlRegistry");
+      }
+
       this[registry] = new MysqlRegistry(options, this);
     } else if (name === "registry") {
       this[registry] = new RAMRegistry(options, this);
@@ -129,31 +130,41 @@ class Class extends EventEmitter {
     this[registry].clean();
   }
 
-  static async get(...args) {
+  static async get(query) {
     if (this[getSignatures]) {
       for (const getSignature of this[getSignatures]) {
-        if (getSignature.test(args[0])) {
-          return getSignature.exec(...args);
+        if (getSignature.test(query)) {
+          return getSignature.exec(query);
         }
       }
     }
 
-    return this[registry].get(...args);
+    return this[registry].get(query);
+  }
+
+  static getStream(where, bindings = {}) {
+    const stream = this[registry].getStream(where);
+
+    for (const [name, listener] of Object.entries(bindings)) {
+      stream.on(name, listener);
+    }
+
+    return stream;
   }
 
   static async create(query) {
     const r = this[registry];
 
     if (!r) {
-      return log.error("Cannot call create() without registry");
+      throw log.error("Cannot call create() without registry");
     }
 
     return r.create(query);
   }
 
-  static join(ClassToJoin, relationship) {
+  static join(ClassToJoin, joinAs, relationship) {
     return new Join(this)
-      .join(ClassToJoin, relationship);
+      .join(ClassToJoin, joinAs, relationship);
   }
 
   constructor(properties) {
@@ -173,7 +184,7 @@ class Class extends EventEmitter {
     const r = this.constructor[registry];
 
     if (!r) {
-      return log.error("Cannot call delete() without registry");
+      throw log.error("Cannot call delete() without registry");
     }
 
     this.emit("delete");
@@ -185,7 +196,7 @@ class Class extends EventEmitter {
     const r = this.constructor[registry];
 
     if (!r) {
-      return log.error("Cannot call update() without registry");
+      throw log.error("Cannot call update() without registry");
     }
 
     const actualUpdate = r[diff](this, values);

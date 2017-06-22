@@ -72,9 +72,9 @@ class Registry extends EventEmitter {
   buildKey(instance) {
     const keys = this.keys.PRIMARY;
 
-    let pKey = String(keys[0].COLUMN_NAME);
+    let pKey = "";
 
-    for (let i = 1; i < keys.length; i += 1) {
+    for (let i = 0; i < keys.length; i += 1) {
       if (!instance.hasOwnProperty(keys[i].COLUMN_NAME)) {
         return false;
       }

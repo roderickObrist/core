@@ -28,7 +28,7 @@ module.exports = new Proxy(Class, {
         }
       }
 
-      return log.error("Circular Dependency", loadingClasses);
+      throw log.error("Circular Dependency", loadingClasses);
     }
 
     if (classes[property] === null) {

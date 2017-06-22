@@ -8,7 +8,7 @@ module.exports = class GetSignature {
     this.Class = Class;
 
     if (!is.func(details.get)) {
-      return log.error("GetSignature must have a get()");
+      throw log.error("GetSignature must have a get()");
     }
 
     this.get = details.get;

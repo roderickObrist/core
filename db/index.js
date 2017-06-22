@@ -8,7 +8,7 @@ const mysql = require('mysql'),
 function make(conf) {
   async function db(sql, param = []) {
     if (!db.pool) {
-      return log.error("Missing DB connection");
+      throw log.error("Missing DB connection");
     }
 
     return new Promise((resolve, reject) => {
@@ -23,6 +23,11 @@ function make(conf) {
       });
     });
   }
+
+  db.stream = (sql, param = []) => {
+    return db.pool.query(sql, param)
+      .stream();
+  };
 
   db.setPool = config => {
     db.poolConfig = Object.assign({queryFormat}, config);

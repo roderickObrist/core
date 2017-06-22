@@ -26,9 +26,11 @@ exports.db = require("./db");
 
 exports.m = require("moment");
 
+exports.fs = require("fs-extra");
+
 exports.EventEmitter = require("./EventEmitter");
 
-// exports.Class = require('./Class');
+exports.Class = require('./Class');
 
 // exports.Command = require("./Command");
 

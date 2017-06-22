@@ -25,14 +25,14 @@ module.exports = class EventEmitter {
     }
 
     if (!is.string(name)) {
-      return log.error("name must be a string");
+      throw log.error("name must be a string");
     }
 
     if (
       needsFunc &&
         !is.func(listener)
     ) {
-      return log.error("listener must be a function");
+      throw log.error("listener must be a function");
     }
 
     for (const eventDescriptor of name.split(" ")) {
@@ -125,7 +125,7 @@ module.exports = class EventEmitter {
       do {
         this[emit](runningEventName, listener, metaArg);
         runningEventName = runningEventName.replace(/(\.|^)[^.]+$/, "");
-      } while (id.length);
+      } while (runningEventName.length);
     }, false);
   }
 

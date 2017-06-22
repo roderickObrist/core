@@ -45,7 +45,7 @@ module.exports = class RAMRegistry extends Registry {
 
   async create(query) {
     if (is.array(query)) {
-      return log.error(".create([array]) is not supported yet");
+      throw log.error(".create([array]) is not supported yet");
     }
 
     const key = this.buildKey(query);

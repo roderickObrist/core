@@ -55,7 +55,7 @@ class BinLogManager extends Class {
 
       this.binLog.query("select @@GLOBAL.binlog_checksum as checksum", (e, checksum) => {
         if (e) {
-          return log.error(e);
+          throw log.error(e);
         }
 
         const binLogSequence = new BinLogSequence({
