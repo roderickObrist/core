@@ -73,7 +73,7 @@ Command.create({
     socket.end();
   });
 
-  tcpServer.listen(config.commandPort || 8000);
+  Command.once("create", () => tcpServer.listen(config.commandPort || 8000));
 });
 
 module.exports = Command;
