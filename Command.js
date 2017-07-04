@@ -1,55 +1,62 @@
 "use strict";
 
-const {is, Class, config} = require('core'),
-  net = require('net');
+const {is, Class, config} = require("core"),
+  net = require("net");
 
-require('colors');
+require("colors");
 
 class Command extends Class {
-  exec(out, finished) {
+  async exec(socket) {
+    this.socket = socket;
+
     if (is.func(this.handler)) {
-      return this.handler(out, finished);
+      return this.handler();
     }
 
-    const commands = Object.keys(this.handler)
-      .concat("Exit");
+    return this.execSubCommand();
+  }
 
-    out(
-      "Available commands are:\n" +
-        commands.map((command, i) => `${String(i + 1).blue.bold}. ${command}`)
-          .join('\n'),
-      input => {
-        let key = input;
+  async execSubCommand() {
+    const commands = [...Object.keys(this.handler), "Exit"],
+      format = commands.map((command, i) => `${String(i + 1).blue.bold}. ${command}`)
+        .join("\n");
 
-        if (/^[0-9]+$/.test(input)) {
-          key = commands[Number(input) - 1];
-        }
+    let input = await this.read(`Available commands are:\n${format}`);
 
-        if (key === "Exit") {
-          return finished();
-        }
+    if (/^[0-9]+$/.test(input)) {
+      input = commands[Number(input) - 1];
+    }
 
-        let handler = this.handler[key];
+    if (input === "Exit") {
+      return Promise.resolve();
+    }
 
-        if (handler) {
-          if (is.func(handler.exec)) {
-            return handler.exec(out, (message) => {
-              if (message) {
-                out(message);
-              }
+    const handler = this.handler[input];
 
-              this.exec(out, finished);
-            });
-          }
+    if (Command.is(handler)) {
+      return handler.exec(this.socket);
+    }
 
-          if (is.func(handler)) {
-            return handler(out, finished);
-          }
-        }
+    if (is.func(handler)) {
+      return handler.call(this);
+    }
 
-        finished(`Unrecognized command ${input}`.red);
-      }
-    );
+    this.write(`Unrecognized command ${input}`.red);
+    return this.execSubCommand();
+  }
+
+  async read(str) {
+    this.wrtie(str);
+
+    return new Promise(resolve => {
+      this.socket.once("data", text => {
+        resolve(text.toString().trim());
+      });
+    });
+  }
+
+  write(str) {
+    this.socket.write(`${str}\n`);
   }
 }
 
@@ -58,26 +65,15 @@ Command.configure("registry", {
 });
 
 Command.create({
-  "name": "Welcome".bold,
-  "handler": {}
-}, (e, welcome) => {
-  net.createServer(socket => {
-    welcome.exec((text, callback) => {
-      socket.write(text + '\n');
-
-      if (callback) {
-        socket.once("data", text => {
-          callback(text.toString().trim());
-        });
-      }
-    }, (message = "Goodbye\n") => {
-      socket.end(message.green);
-    });
-  }).listen(config.commandPort || 8000);
-
-  Command.on("create", newCommand => {
-    welcome.handler[newCommand.name] = newCommand;
+  "handler": Command[Symbol.for("registry")][Symbol.for("storage")],
+  "name": "Welcome".bold
+}).then(welcome => {
+  const tcpServer = net.createServer(async socket => {
+    await welcome.exec(socket);
+    socket.end();
   });
+
+  tcpServer.listen(config.commandPort || 8000);
 });
 
 module.exports = Command;

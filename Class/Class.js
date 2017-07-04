@@ -9,7 +9,6 @@ const {EventEmitter, log} = require("../index"),
   GetSignature = require("./GetSignature"),
   RAMRegistry = require("./RAMRegistry"),
   registry = Symbol.for("registry"),
-  {Transform} = require("stream"),
   diff = Symbol.for("diff"),
   Join = require("./Join"),
   ee = Symbol.for("ee");
@@ -165,6 +164,10 @@ class Class extends EventEmitter {
   static join(ClassToJoin, joinAs, relationship) {
     return new Join(this)
       .join(ClassToJoin, joinAs, relationship);
+  }
+
+  static is(instance) {
+    return instance instanceof this;
   }
 
   constructor(properties) {

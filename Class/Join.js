@@ -5,11 +5,9 @@ const {log, is} = require("../index"),
   registry = Symbol.for("registry");
 
 function ns(regOrKey) {
-  if (regOrKey.COLUMN_NAME) {
-    return `${regOrKey.REFERENCED_TABLE_SCHEMA}.${regOrKey.REFERENCED_TABLE_NAME}`;
-  }
-
-  return `${regOrKey.options.database}.${regOrKey.options.name}`;
+  return regOrKey.COLUMN_NAME
+    ? `${regOrKey.REFERENCED_TABLE_SCHEMA}.${regOrKey.REFERENCED_TABLE_NAME}`
+    : `${regOrKey.options.database}.${regOrKey.options.name}`;
 }
 
 module.exports = class Join {

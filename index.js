@@ -30,9 +30,9 @@ exports.fs = require("fs-extra");
 
 exports.EventEmitter = require("./EventEmitter");
 
-exports.Class = require('./Class');
+exports.Class = require("./Class");
 
-// exports.Command = require("./Command");
+exports.Command = require("./Command");
 
 function onErr(err) {
   const details = {"path": "uncaughtException"};
