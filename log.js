@@ -3,7 +3,8 @@
 const canHandleColors = process.stdout.isTTY,
   {config} = require('./index'),
   moment = require('moment'),
-  r = require('rethinkdb');
+  r = require('rethinkdb'),
+  os = require("os");
 
 require('colors');
 
@@ -69,7 +70,23 @@ if (config.rethinkdb) {
 function stamp(data, level) {
   data.level = level;
   data.timestamp = r.now();
-  data.server = config.mode;
+  data.server = config.mode || os.hostname();
+
+  if (!data.protocol) {
+    data.protocol = "LOG";
+  }
+
+  if (!data.direction) {
+    data.direction = "OUT";
+  }
+
+  if (!data.path) {
+    data.path = "";
+  }
+
+  if (!data.connectionId) {
+    data.connectionId = "";
+  }
 }
 
 function formatMultipleArgs(message, extra, level) {
@@ -135,6 +152,10 @@ function formatMultipleArgs(message, extra, level) {
 
   if (!data.protocol) {
     data.protocol = level.toUpperCase();
+
+    if (data.protocol === "ERROR") {
+      data.protocol = "ERR";
+    }
   }
 
   if (
@@ -152,18 +173,14 @@ function formatMultipleArgs(message, extra, level) {
 exports.info = (data, stringified) => {
   const t = new Date();
 
-  if (typeof data === "string") {
-    if (canHandleColors) {
-      const time = t.toTimeString().substr(0, 8);
-
-      console.log(`${time.bold.green}: ${data}`);
-
-      if (stringified) {
-        console.log(stringified);
-      }
-    }
-
-    return;
+  if (
+    !data ||
+      typeof data === "string" ||
+      !["connectionId", "direction", "protocol", "path"].some(name => data.hasOwnProperty(name))
+  ) {
+    data = {
+      "body": data
+    };
   }
 
   stamp(data, 'info');
@@ -227,7 +244,7 @@ exports.error = (message, extra) => {
   if (!canHandleColors) {
     console.error(`${data.body.code} ${JSON.stringify(data.body, '', 2)}`);
   } else {
-    console.log(`${data.body.code.bold.red} ${JSON.stringify(data.body, '', 2)}`);
+    console.log(`${String(data.body.code).bold.red} ${JSON.stringify(data.body, '', 2)}`);
   }
 
   return errorObject;

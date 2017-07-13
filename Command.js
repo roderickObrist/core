@@ -31,7 +31,13 @@ class Command extends Class {
       return Promise.resolve();
     }
 
-    const handler = this.handler[input];
+    let handler = this;
+
+    const tree = input.split('.');
+
+    do {
+      handler = handler.handler[tree.shift()];
+    } while (tree.length);
 
     if (Command.is(handler)) {
       return handler.exec(this.socket);
@@ -46,7 +52,7 @@ class Command extends Class {
   }
 
   async read(str) {
-    this.wrtie(str);
+    this.write(str);
 
     return new Promise(resolve => {
       this.socket.once("data", text => {
@@ -65,15 +71,24 @@ Command.configure("registry", {
 });
 
 Command.create({
-  "handler": Command[Symbol.for("registry")][Symbol.for("storage")],
+  "handler": {},
   "name": "Welcome".bold
-}).then(welcome => {
-  const tcpServer = net.createServer(async socket => {
-    await welcome.exec(socket);
-    socket.end();
-  });
+})
 
-  Command.once("create", () => tcpServer.listen(config.commandPort || 8000));
+Command.on("create", async command => {
+  const [welcome] = await Command.get({"name": "Welcome".bold});
+
+  if (!welcome.tcpServer) {
+    welcome.tcpServer = net.createServer(async socket => {
+      await welcome.exec(socket);
+
+      socket.end();
+    });
+
+    welcome.tcpServer.listen(config.commandPort || 8000);
+  }
+
+  welcome.handler[command.name] = command;
 });
 
 module.exports = Command;

@@ -58,11 +58,11 @@ module.exports = class EventEmitter {
 
   [addBinding](binding) {
     if (!this[listeners][binding.id]) {
-      this.describe(binding.id);
+      EventEmitter.prototype.describe.call(this, binding.id);
     }
 
     if (binding.id !== "new.listener") {
-      this.emit("new.listener", {
+      EventEmitter.prototype.emit.call(this, "new.listener", {
         "listener": binding.listener,
         "name": binding.id
       });
@@ -117,7 +117,7 @@ module.exports = class EventEmitter {
 
       // listener is actually argument
       if (!this[listeners][id]) {
-        this.describe(id);
+        EventEmitter.prototype.describe.call(this, id);
       }
 
       let runningEventName = id;
@@ -168,6 +168,6 @@ module.exports = class EventEmitter {
       return this;
     }
 
-    return this.emit("new.event", bindingId);
+    return EventEmitter.prototype.emit.call(this, "new.event", bindingId);
   }
 };

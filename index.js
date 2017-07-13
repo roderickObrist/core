@@ -13,7 +13,7 @@ try {
     throw e;
   }
 
-  exports.config = require(path.join(__dirname, "../config"));
+  exports.config = require(path.join(__dirname, "../../config"));
 }
 
 exports.log = require("./log");
