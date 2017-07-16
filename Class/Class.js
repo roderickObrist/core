@@ -155,7 +155,7 @@ class Class extends EventEmitter {
     const r = this[registry];
 
     if (!r) {
-      throw log.error("Cannot call create() without registry");
+      return new this(query);
     }
 
     return r.create(query);
