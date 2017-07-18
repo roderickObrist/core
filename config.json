@@ -3,5 +3,10 @@
     "user": "root",
     "password": "r0ddy1",
     "database": "PERMACONN"
-  }
+  },
+  "rethinkdb": {
+    "db": "log",
+    "host": "192.168.7.101"
+  },
+  "mode": "debug-rod"
 }

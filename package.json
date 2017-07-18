@@ -78,7 +78,10 @@
       "consistent-this": [
         "error",
         "self"
-      ]
+      ],
+      "no-confusing-arrow": 0,
+      "sort-keys": 0,
+      "no-undefined": 0
     }
   }
 }

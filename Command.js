@@ -1,6 +1,6 @@
 "use strict";
 
-const {is, Class, config} = require("core"),
+const {is, Class, config} = require("./"),
   net = require("net");
 
 require("colors");

@@ -8,12 +8,21 @@ exports.is = require("./is");
 
 try {
   exports.config = require(path.join(dir, "config"));
+
+  if (!exports.config.dir) {
+    exports.config.dir = dir;
+  }
+
 } catch (e) {
   if (!e.message.startsWith("Cannot find module ")) {
     throw e;
   }
 
   exports.config = require(path.join(__dirname, "../../config"));
+
+  if (!exports.config.dir) {
+    exports.config.dir = path.join(__dirname, "../../");
+  }
 }
 
 exports.log = require("./log");
