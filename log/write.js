@@ -13,6 +13,14 @@ require("colors");
 
 module.exports = (data, stringified = JSON.stringify(data.body)) => {
   store(data);
+
+  if (
+    config.noConsole &&
+      config.noConsole.includes(data.protocol)
+  ) {
+    return;
+  }
+
   print(data, stringified);
 };
 
