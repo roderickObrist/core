@@ -74,6 +74,28 @@ module.exports = class RAMRegistry extends Registry {
   }
 
   [diff](instance, query) {
-    throw "TODO";
+    const keys = Object.keys(query)
+      .filter(key => {
+        if (!instance.hasOwnProperty(key)) {
+          return true;
+        }
+
+        if (query[key] instanceof Date) {
+          return instance[key] instanceof Date &&
+            query[key].getTime() !== instance[key].getTime();
+        }
+
+        return instance[key] !== query[key];
+      });
+
+    if (keys.length === 0) {
+      return false;
+    }
+
+    let diff = {};
+
+    keys.forEach(key => diff[key] = query[key]);
+
+    return diff;
   }
 };

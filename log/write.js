@@ -105,7 +105,7 @@ print = (data, stringified) => {
       : "yellow";
 
     if (canHandleColors) {
-      console.error(`${data.body.code.bold[severity]} ${stringified}`);
+      console.error(`${(data.body.code || data.path).bold[severity]} ${stringified}`);
     } else {
       console.error(`${data.path} ${stringified}`);
     }

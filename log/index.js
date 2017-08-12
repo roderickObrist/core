@@ -134,7 +134,7 @@ function formatMultipleArgs(all, level) {
   });
 
   if (!body.code) {
-    body.code = errorObject.code || errorObject.message;
+    body.code = String(errorObject.code || errorObject.message || path);
   }
 
   if (all.length === 1) {
