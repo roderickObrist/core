@@ -18,7 +18,7 @@ module.exports = class EventEmitter {
   [parse](name, listener, forEach, needsFunc = true) {
     if (is.baseObject(name)) {
       for (const key of Object.keys(name)) {
-        this[parse](key, listener, forEach, needsFunc);
+        this[parse](key, name[key], forEach, needsFunc);
       }
 
       return this;
@@ -88,14 +88,14 @@ module.exports = class EventEmitter {
   }
 
   off(name, listener) {
-    return this[parse](name, listener, (id, listenerFunc) => {
+    return this[parse](name, listener, ({id, listener}) => {
       const container = this[listeners][id];
 
       if (container) {
         const {bindings} = container;
 
         for (let i = 0; i < bindings.length; i += 1) {
-          if (bindings[i].listener === listenerFunc) {
+          if (bindings[i].listener === listener) {
             bindings.splice(i, 1);
             return;
           }
