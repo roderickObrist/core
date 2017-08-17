@@ -43,13 +43,38 @@ module.exports = (data, stringified = JSON.stringify(data.body)) => {
 
   let state = "connected";
 
-  async function insert(data) {
-    return r.db("log")
-      .table(moment().format("YYYY_MM_DD"))
-      .insert(data)
-      .run(conn, {
+  async function insert(data, secondAttempt = false) {
+    try {
+      const query = r.db("log")
+        .table(moment().format("YYYY_MM_DD"))
+        .insert(data);
+
+      await query.run(conn, {
         "durability": "soft"
       });
+    } catch (e) {
+      if (e instanceof r.Error.ReqlCompileError) {
+        if (secondAttempt) {
+          throw e;
+        }
+
+        for (const d of [].concat(data)) {
+          d.body = JSON.parse(JSON.stringify(d.body));
+
+          const messageKey = d.body.code
+            ? "retryCode"
+            : "code";
+
+          d.level = "warn";
+          d.body[messageKey] = e.message;
+        }
+
+        insert(data, true);
+        return;
+      }
+
+      throw e;
+    }
   }
 
   // Empty the buffer
