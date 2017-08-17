@@ -449,6 +449,23 @@
       );
   };
 
+  /* Function: phoneNumber
+   * This function checks for a phone number, due to the number of use cases length could not be checked, so an optional length parameter can be provided
+   *
+   * Parameters:
+   * value - *var* Any value that when casted to a string is checked as a phone number
+   * optLength - *int* An optional int that can be used to check the clean length of the number
+   *
+   * Errors:
+   * (none)
+   *
+   * Returns:
+   * isPhoneNumber - *bool* A boolean indicating if the value is a phone number
+   */
+  is.properName = function properName(value, optLength) {
+    return /^[A-Z][a-z]+$/.test(value);
+  };
+
   /* Function: func
    * The function checks the instanceof first, then fallsback on the Object.prototype.toString method, however this still fails in IE8 and below
    * on native functions, so it then calls nativeFunc if the first two fail.
@@ -469,6 +486,29 @@
       /* FOR IE8 USE THE SLOWER METHOD */
       is.nativeFunc(value);
   };
+
+  /* Function: asyncFunc
+   * The function checks the instanceof first, then fallsback on the Object.prototype.toString method
+   *
+   * Parameters:
+   * value - *function* The value to be checked
+   *
+   * Errors:
+   * (none)
+   *
+   * Returns:
+   * isFunction - *bool* A boolean indicating if the value is indeed an AsyncFunction
+   */
+  is.asyncFunc = function asyncFunc(value) {
+    return (value instanceof asyncFunc.AsyncFunction) ||
+      (Object.prototype.toString.call(value) === "[object AsyncFunction]");
+  };
+
+  try {
+    is.asyncFunc.AsyncFunction = (async function () {}).constructor;
+  } catch (e) {
+    // for env that does not support async func
+  }
 
   /* Function: nativeFunc
    * This method will decompile the function by using it's toString method and passing it to a relatively complex regular expression.
