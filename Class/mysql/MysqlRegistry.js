@@ -358,6 +358,8 @@ class MysqlRegistry extends Registry {
   }
 
   async update(instance, values) {
+    const {name, database} = this.options;
+
     await this.schema;
 
     /* eslint consistent-return: 0 */
@@ -387,7 +389,7 @@ class MysqlRegistry extends Registry {
     }
 
     const currentPK = {},
-      param = [this.options.database, this.options.name, values, currentPK];
+      param = [database, name, values, currentPK];
 
     this.keys.PRIMARY.forEach(key => {
       currentPK[key.COLUMN_NAME] = instance[key.COLUMN_NAME];
@@ -411,7 +413,7 @@ class MysqlRegistry extends Registry {
         FROM ??.??
       `;
 
-      param.push(selectPK);
+      param.push(database, name, selectPK);
 
       // Does the PK change?
       for (const key of this.keys.PRIMARY) {
@@ -536,11 +538,14 @@ class MysqlRegistry extends Registry {
         return Number(instance[name]).toFixed(col.decimalPlaces) !==
           Number(newVal).toFixed(col.decimalPlaces);
 
+      case types.VAR_STRING:
+      case types.STRING:
+        return instance[name] !== newVal;
+
       default:
         throw log.error(`${col.type} is not supported yet`, {col});
       }
 
-      return instance[name] !== newVal;
     });
 
     if (keysThatClash.length === 0) {
