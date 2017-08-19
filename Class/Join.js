@@ -49,6 +49,8 @@ module.exports = class Join {
   }
 
   async prepareKeys() {
+    this.foreignKeys = {};
+
     for (const join of this.joins) {
       const joinRegistry = join.Class[registry];
 
@@ -58,8 +60,6 @@ module.exports = class Join {
 
       this.analyseKeys(joinRegistry);
     }
-
-    this.foreignKeys = {};
   }
 
   async get(where) {
@@ -258,8 +258,14 @@ module.exports = class Join {
             FROM.sql += " && ";
           }
 
-          FROM.sql += "?? = ??.??";
-          FROM.param.push(key, ij.joinAs, relationship[key]);
+          if (key.includes(".")) {
+            FROM.sql += "??.?? = ??.??";
+            FROM.param.push(...key.split("."));
+            FROM.param.push(ij.joinAs, relationship[key]);
+          } else {
+            FROM.sql += "?? = ??.??";
+            FROM.param.push(key, ij.joinAs, relationship[key]);
+          }
         });
 
         FROM.sql += ")";

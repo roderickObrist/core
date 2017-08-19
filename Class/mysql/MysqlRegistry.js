@@ -411,6 +411,7 @@ class MysqlRegistry extends Registry {
       sql += `
         SELECT *
         FROM ??.??
+        WHERE ?
       `;
 
       param.push(database, name, selectPK);
