@@ -462,8 +462,8 @@
    * Returns:
    * isPhoneNumber - *bool* A boolean indicating if the value is a phone number
    */
-  is.properName = function properName(value, optLength) {
-    return /^[A-Z][a-z]+$/.test(value);
+  is.properName = function properName(value) {
+    return /^[A-Z]([a-z]*['`’][A-Za-z])?[a-z]+$/.test(value);
   };
 
   /* Function: func
