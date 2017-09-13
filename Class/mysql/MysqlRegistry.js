@@ -183,8 +183,22 @@ class MysqlRegistry extends Registry {
 
       case types.VARCHAR:
       case types.STRING:
-        column.maxLength = Number(/\(([0-9]+)\)/.exec(column.COLUMN_TYPE)[1]);
-        break;
+      case types.TINY_BLOB:
+      case types.BLOB:
+      case types.MEDIUM_BLOB:
+      case types.LONG_BLOB:
+        if (/\([0-9]+\)/.test(column.COLUMN_TYPE)) {
+          column.maxLength = Number(/\(([0-9]+)\)/.exec(column.COLUMN_TYPE)[1]);
+        } else if (column.type === types.TINY_BLOB) {
+          column.maxLength = Math.pow(2,  8) - 1;
+        } else if (column.type === types.BLOB) {
+          column.maxLength = Math.pow(2, 16) - 1;
+        } else if (column.type === types.MEDIUM_BLOB) {
+          column.maxLength = Math.pow(2, 24) - 1;
+        } else if (column.type === types.LONG_BLOB) {
+          column.maxLength = Math.pow(2, 32) - 1;
+        }
+      break;
 
       case types.ENUM:
         column.options = column.COLUMN_TYPE.slice(5, -1)
@@ -229,6 +243,7 @@ class MysqlRegistry extends Registry {
         break;
 
       default:
+      console.log(column);
         throw log.error(`unsupported type${column.type}`);
       }
     });
@@ -541,6 +556,10 @@ class MysqlRegistry extends Registry {
 
       case types.VAR_STRING:
       case types.STRING:
+      case types.TINY_BLOB:
+      case types.BLOB:
+      case types.MEDIUM_BLOB:
+      case types.LONG_BLOB:
         return instance[name] !== newVal;
 
       default:

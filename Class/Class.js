@@ -2,7 +2,7 @@
 
 "use strict";
 
-const {EventEmitter, log} = require("../index"),
+const {EventEmitter, log, is} = require("../index"),
   getEventEmitter = Symbol.for("getEventEmitter"),
   getSignatures = Symbol.for("getSignatures"),
   configureSet = Symbol.for("configureSet"),
@@ -159,6 +159,30 @@ class Class extends EventEmitter {
     }
 
     return r.create(query);
+  }
+
+  static async getOrCreate(query) {
+    if (is.array(query)) {
+      return Promise.all(query.map(q => this.getOrCreate(q)));
+    }
+
+    // This is the correct way to do a getOrCreate, it avoids race conditions
+    // two people simultaneously calling getOrCreate for the same row
+    try {
+      return await this.create(query);
+    } catch (e) {
+      if (e.code === "ER_DUP_ENTRY") {
+        const [target] = await this.get(query);
+
+        if (target) {
+          return target
+        }
+
+        // Then they don't match on all keys
+      }
+
+      throw e;
+    }
   }
 
   static join(ClassToJoin, joinAs, relationship) {

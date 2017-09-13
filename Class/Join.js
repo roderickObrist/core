@@ -254,6 +254,12 @@ module.exports = class Join {
         FROM.sql += " ON(";
 
         relationshipKeys.forEach((key, i) => {
+          const value = relationship[key].split(".");
+
+          if (value.length === 1) {
+            value.unshift(ij.joinAs);
+          }
+
           if (i) {
             FROM.sql += " && ";
           }
@@ -261,11 +267,12 @@ module.exports = class Join {
           if (key.includes(".")) {
             FROM.sql += "??.?? = ??.??";
             FROM.param.push(...key.split("."));
-            FROM.param.push(ij.joinAs, relationship[key]);
+            FROM.param.push(...value);
           } else {
             FROM.sql += "?? = ??.??";
-            FROM.param.push(key, ij.joinAs, relationship[key]);
+            FROM.param.push(key, ...value);
           }
+
         });
 
         FROM.sql += ")";

@@ -53,13 +53,36 @@ module.exports = (data, stringified = JSON.stringify(data.body)) => {
         "durability": "soft"
       });
     } catch (e) {
-      if (e instanceof r.Error.ReqlCompileError) {
-        if (secondAttempt) {
-          throw e;
-        }
+      if (secondAttempt) {
+        console.error(data);
+        throw e;
+      }
 
+      // This is what happens during circular references
+      if (e instanceof r.Error.ReqlCompileError) {
         for (const d of [].concat(data)) {
           d.body = JSON.parse(JSON.stringify(d.body));
+
+          const messageKey = d.body.code
+            ? "retryCode"
+            : "code";
+
+          d.level = "warn";
+          d.body[messageKey] = e.message;
+        }
+
+        insert(data, true);
+        return;
+      }
+
+      // This is what happens when a string is really long and rethink craps it
+      if (e.message === "Cannot read property 'length' of undefined") {
+        for (const d of [].concat(data)) {
+          d.body = JSON.parse(JSON.stringify(d.body, (key, value) => {
+            return is.string(value, 1e3, Infinity)
+              ? value.slice(0, 1e3) + "...TRUNCATED"
+              : value;
+          }));
 
           const messageKey = d.body.code
             ? "retryCode"
