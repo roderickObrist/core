@@ -807,6 +807,10 @@
     return Object.prototype.toString.call(value) === "[object Boolean]";
   };
 
+  is.regex = function (value) {
+    return value instanceof RegExp;
+  };
+
   if (typeof module === 'object') {
     module.exports = is;
   } else if (typeof define === 'function') {

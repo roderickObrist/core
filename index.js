@@ -48,6 +48,11 @@ function onErr(err) {
     };
   }
 
+  // now we can throw log.error();
+  if (err[Symbol.for("logged")] === true) {
+    return;
+  }
+
   exports.log.error(details, err);
 }
 

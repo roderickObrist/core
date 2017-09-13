@@ -149,13 +149,19 @@ function formatMultipleArgs(all, level) {
     });
   }
 
-  return makeBase(level, {
+  if (!errorObject.message) {
+    errorObject.message = body.code;
+  }
+
+  errorObject[Symbol.for("logged")] = true;
+
+  return [makeBase(level, {
     connectionId,
     direction,
     protocol,
     path,
     body
-  });
+  }), errorObject];
 }
 
 exports.info = (data, optionalStringified) => {
@@ -190,20 +196,20 @@ exports.dump = (...all) => {
 };
 
 exports.warn = (...all) => {
-  const base = formatMultipleArgs(all, "warn");
+  const [base, err] = formatMultipleArgs(all, "warn");
 
   write(base, safeStringify(base, 2));
 
+  return err;
 };
 
 exports.error = (...all) => {
-  const base = formatMultipleArgs(all, "error");
-
-  //exports.dump(base);
+  const [base, err] = formatMultipleArgs(all, "error");
 
   write(base, safeStringify(base, 2));
-};
 
+  return err;
+};
 
 exports.session = (details, stringified) => {
   const {
