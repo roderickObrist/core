@@ -326,8 +326,7 @@ class MysqlRegistry extends Registry {
       ],
       pks = this.keys.PRIMARY,
       isEveryPKInQuery = pks.every(pk => query.hasOwnProperty(pk.COLUMN_NAME)),
-      isOneAutoIncrement = pks.length === 1 &&
-        this.columns[pks[0].COLUMN_NAME].EXTRA === "auto_increment";
+      autoIncrement = pks.find(({COLUMN_NAME}) => this.columns[COLUMN_NAME].EXTRA === "auto_increment")
 
     let sql = `
       INSERT INTO ??.??
@@ -346,11 +345,33 @@ class MysqlRegistry extends Registry {
       });
 
       param.push(where);
-    } else if (isOneAutoIncrement) {
-      sql += " WHERE ?? = LAST_INSERT_ID()";
-      param.push(pks[0].COLUMN_NAME);
+    } else if (autoIncrement) {
+      if (pks.length === 1) {
+        sql += " WHERE ?? = LAST_INSERT_ID()";
+        param.push(pks[0].COLUMN_NAME);
+      } else if (
+          autoIncrement &&
+            pks.every(pk => pk === autoIncrement || query.hasOwnProperty(pk.COLUMN_NAME))
+      ) {
+        const where = {};
+
+        sql += " WHERE ?";
+
+        pks.forEach((pk) => {
+          if (pk !== autoIncrement) {
+            where[pk.COLUMN_NAME] = query[pk.COLUMN_NAME];
+          }
+        });
+
+        param.push(where);
+
+        sql += " && ?? = LAST_INSERT_ID()";
+        param.push(pks[0].COLUMN_NAME);
+      } else {
+        throw log.error("Missing Primary key in insert default values?");
+      }
     } else {
-      throw log.error("Manage your auto increment rows or PKs with default values?");
+      throw log.error("Missing Primary key in insert default values?");
     }
 
     // Cant passthrough because it's a multi statement query
