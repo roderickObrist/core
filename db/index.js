@@ -16,6 +16,7 @@ function make(conf) {
         if (err) {
           err.query = sql;
           err.param = param;
+          err.formatted = queryFormat(sql.sql || sql, param);
           return reject(err);
         }
 

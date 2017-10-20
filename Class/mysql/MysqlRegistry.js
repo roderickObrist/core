@@ -190,7 +190,7 @@ class MysqlRegistry extends Registry {
         if (/\([0-9]+\)/.test(column.COLUMN_TYPE)) {
           column.maxLength = Number(/\(([0-9]+)\)/.exec(column.COLUMN_TYPE)[1]);
         } else if (column.type === types.TINY_BLOB) {
-          column.maxLength = Math.pow(2,  8) - 1;
+          column.maxLength = Math.pow(2, 8) - 1;
         } else if (column.type === types.BLOB) {
           column.maxLength = Math.pow(2, 16) - 1;
         } else if (column.type === types.MEDIUM_BLOB) {
@@ -314,7 +314,7 @@ class MysqlRegistry extends Registry {
     await this.schema;
 
     if (is.array(query)) {
-      throw this.error("Create with array is not implemented yet");
+      return this.createMany(query);
     }
 
     const param = [
@@ -326,7 +326,7 @@ class MysqlRegistry extends Registry {
       ],
       pks = this.keys.PRIMARY,
       isEveryPKInQuery = pks.every(pk => query.hasOwnProperty(pk.COLUMN_NAME)),
-      autoIncrement = pks.find(({COLUMN_NAME}) => this.columns[COLUMN_NAME].EXTRA === "auto_increment")
+      autoIncrement = pks.find(({COLUMN_NAME}) => this.columns[COLUMN_NAME].EXTRA === "auto_increment");
 
     let sql = `
       INSERT INTO ??.??
@@ -350,8 +350,8 @@ class MysqlRegistry extends Registry {
         sql += " WHERE ?? = LAST_INSERT_ID()";
         param.push(pks[0].COLUMN_NAME);
       } else if (
-          autoIncrement &&
-            pks.every(pk => pk === autoIncrement || query.hasOwnProperty(pk.COLUMN_NAME))
+        autoIncrement &&
+          pks.every(pk => pk === autoIncrement || query.hasOwnProperty(pk.COLUMN_NAME))
       ) {
         const where = {};
 
@@ -391,6 +391,30 @@ class MysqlRegistry extends Registry {
     }
 
     return instance;
+  }
+
+  async createMany(query) {
+    let sql = "INSERT INTO ??.?? (";
+
+    const keys = Object.keys(query[0]),
+      values = [this.options.database, this.options.name, ...keys],
+      row = `(${keys.map(() => "?").join(", ")})`;
+
+    sql += keys.map(() => "??")
+      .join(", ");
+
+    sql += ") VALUES ";
+
+    for (const value of query) {
+      if (value !== query[0]) {
+        sql += ", ";
+      }
+
+      sql += row;
+      values.push(...Object.values(value));
+    }
+
+    return this.db(sql, values);
   }
 
   async update(instance, values) {
@@ -586,7 +610,6 @@ class MysqlRegistry extends Registry {
       default:
         throw log.error(`${col.type} is not supported yet`, {col});
       }
-
     });
 
     if (keysThatClash.length === 0) {

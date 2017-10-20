@@ -127,7 +127,7 @@ function formatMultipleArgs(all, level) {
     .filter((line, i) => i && !line.includes(__filename))
     .map(line => line.trim());
 
-  ["query", "param"].forEach(key => {
+  ["query", "param", "formatted"].forEach(key => {
     if (errorObject[key]) {
       body[key] = errorObject[key];
     }

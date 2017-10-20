@@ -2,7 +2,9 @@
 
 const {log, is} = require("../index"),
   {Transform} = require("stream"),
-  registry = Symbol.for("registry");
+  registry = Symbol.for("registry"),
+  order = Symbol.for("order"),
+  limit = Symbol.for("limit");
 
 function ns(regOrKey) {
   return regOrKey.COLUMN_NAME
@@ -280,8 +282,24 @@ module.exports = class Join {
     }
 
     if (where) {
-      FROM.sql += " WHERE ?";
-      FROM.param.push(where);
+      const o = where[order],
+        l = where[limit];
+
+      delete where[order];
+      delete where[limit];
+
+      if (Object.keys(where).length) {
+        FROM.sql += " WHERE ?";
+        FROM.param.push(where);
+      }
+
+      if (o) {
+        FROM.sql += ` ORDER BY ${o}`;
+      }
+
+      if (l) {
+        FROM.sql += ` LIMIT ${l}`;
+      }
     }
 
     return {
