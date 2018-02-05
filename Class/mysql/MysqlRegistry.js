@@ -576,6 +576,7 @@ class MysqlRegistry extends Registry {
       switch (col.type) {
       case types.TIMESTAMP:
       case types.DATETIME:
+      case types.DATETIME2:
         return Number(instance[name]) !== 1e3 * Math.floor(Number(newVal) / 1e3);
 
       case types.ENUM:
