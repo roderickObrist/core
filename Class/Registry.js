@@ -51,6 +51,8 @@ class Registry extends EventEmitter {
 
     instance[timestamp] = Date.now();
 
+    instance.emit("update", updateValue);
+
     if (!hasPKeyChange) {
       return;
     }
