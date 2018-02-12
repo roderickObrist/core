@@ -214,7 +214,7 @@ class Class extends EventEmitter {
       throw log.error("Cannot call delete() without registry");
     }
 
-    this.emit("delete");
+    this.emit("delete", this);
 
     return r.delete(this);
   }
