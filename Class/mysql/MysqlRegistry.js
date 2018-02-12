@@ -579,12 +579,6 @@ class MysqlRegistry extends Registry {
       case types.DATETIME2:
         return Number(instance[name]) !== 1e3 * Math.floor(Number(newVal) / 1e3);
 
-      case types.ENUM:
-        if (col.optionsIndex[newVal] !== true) {
-          throw log.error(`"${newVal}" is not a suitable ENUM value`, {col});
-        }
-        break;
-
       case types.SET:
         throw log.error("figure it out", {col});
 
@@ -600,6 +594,12 @@ class MysqlRegistry extends Registry {
         return Number(instance[name]).toFixed(col.decimalPlaces) !==
           Number(newVal).toFixed(col.decimalPlaces);
 
+
+      case types.ENUM:
+        if (col.optionsIndex[newVal] !== true) {
+          throw log.error(`"${newVal}" is not a suitable ENUM value`, {col});
+        }
+      // Falls through
       case types.VAR_STRING:
       case types.STRING:
       case types.TINY_BLOB:

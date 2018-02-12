@@ -13,15 +13,17 @@ function where(paramObj) {
       isNot = (/([!<>])$/).exec(key);
 
     if (/ LIKE$/.test(key)) {
-
+      const [, colName] = /^([^ ]+)/.exec(key),
+        operator = key.replace(/^([^ ]+)/, "");
       // LIKE Syntax:
       // "col LIKE": "val%"
       // "col LIKE": ["val%", "%ue", "%alu%"]
       // "col NOT LIKE": ["val%", "%ue", "%alu%"]
+
       if (isMultiple) {
-        sql += b(value.map(v => `${key} ${e(v)}`).join(" || "));
+        sql += b(value.map(v => `${mysql.escapeId(colName)}${operator} ${e(v)}`).join(" || "));
       } else {
-        sql += `${key} ${mysql.escape(value)}`;
+        sql += `${mysql.escapeId(colName)}${operator}${mysql.escape(value)}`;
       }
     } else if (key === "||") {
 
@@ -51,26 +53,20 @@ function where(paramObj) {
         sql += b(value.map(v => b(where(v)))
             .join(" || "));
       }
-    } else if (isMultiple) {
-      sql += isNot
-        ? key.slice(0, -1)
-        : key;
-
-      sql += " ";
-
-      sql += isNot
-        ? "NOT "
-        : "";
-
-      sql += `IN (${e(value)})`;
     } else {
       sql += isNot
-        ? key.slice(0, -1)
-        : key;
+        ? mysql.escapeId(key.slice(0, -1))
+        : mysql.escapeId(key);
 
       sql += " ";
+      
+      if (isMultiple) {
+        sql += isNot
+          ? "NOT "
+          : "";
 
-      if (value === null) {
+        sql += `IN (${e(value)})`;
+      } else if (value === null) {
         sql += "IS ";
 
         sql += isNot
