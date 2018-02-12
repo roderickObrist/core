@@ -387,7 +387,7 @@ class MysqlRegistry extends Registry {
     const instance = this.rowToInstance(result[1][0]);
 
     if (!this.options.binLog) {
-      this.emit("create", instance);
+      instance.emit("create", instance);
     }
 
     return instance;
