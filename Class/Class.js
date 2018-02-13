@@ -129,6 +129,10 @@ class Class extends EventEmitter {
     this[registry].clean();
   }
 
+  static registryEntries() {
+    return Object.values(this[registry][Symbol.for("storage")]);
+  }
+
   static async get(query) {
     if (this[getSignatures]) {
       for (const getSignature of this[getSignatures]) {
