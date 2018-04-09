@@ -56,5 +56,11 @@ function onErr(err) {
   exports.log.error(details, err);
 }
 
-process.on("unhandledRejection", onErr)
-  .on("uncaughtException", onErr);
+if (exports.config.exitOnError) {
+  process.on("unhandledRejection", err => {
+    throw err;
+  });
+} else {
+  process.on("unhandledRejection", onErr)
+    .on("uncaughtException", onErr);
+}
