@@ -151,6 +151,16 @@ module.exports = class EventEmitter {
     const bindings = container.bindings.slice(0);
 
     for (const binding of bindings) {
+      if (binding.n) {
+        if (container.n < binding.n) {
+          continue;
+        }
+        
+        if (container.n > binding.n) {
+          container.bindings.splice(container.bindings.indexOf(binding), 1);
+        }
+      }
+
       if (container.bindings.includes(binding)) {
         binding.listener.call(this, argument, eventContext);
       }
