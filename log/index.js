@@ -16,7 +16,7 @@ function makeBase(level, {connectionId = "", direction = "OUT", protocol = level
     path,
     body,
     "timestamp": r.now(),
-    "server": config.mode || os.hostname()
+    "server": os.hostname()
   };
 
   if (base.body === undefined) {
