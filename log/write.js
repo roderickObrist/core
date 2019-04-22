@@ -6,33 +6,13 @@ const canHandleColors = process.stdout.isTTY,
   r = require("rethinkdb"),
   noop = () => {};
 
-let store = noop,
-  print = noop;
-
 require("colors");
 
-module.exports = (data, stringified = JSON.stringify(data.body)) => {
-  store(data);
-
-  if (
-    config.noConsole &&
-      config.noConsole.includes(data.protocol)
-  ) {
-    return;
-  }
-
-  print(data, stringified);
-};
-
-(async rethinkdb => {
-  if (!rethinkdb) {
-    return;
-  }
-
+let store = async data => {
   let conn = null;
 
   store = data => store.buffer.push(data);
-  store.buffer = [];
+  store.buffer = [data];
 
   try {
     conn = await r.connect(rethinkdb);
@@ -136,9 +116,13 @@ module.exports = (data, stringified = JSON.stringify(data.body)) => {
     .on("error", () => {
       store = noop;
     });
-})(config.rethinkdb);
+};
 
-print = (data, stringified) => {
+if (!config.rethinkdb) {
+  store = noop;
+}
+
+function print(data, stringified) {
   const t = new Date(),
     maxStrLen = canHandleColors
       ? process.stdout.columns - 19
@@ -177,5 +161,17 @@ print = (data, stringified) => {
     protoConnectionDirection = `${data.protocol}: [${data.connectionId}] ${data.direction}`;
 
   console.log(`${time} - ${protoConnectionDirection}: ${stringifiedCapped}`);
-};
+}
 
+module.exports = (data, stringified = JSON.stringify(data.body)) => {
+  store(data);
+
+  if (
+    config.noConsole &&
+      config.noConsole.includes(data.protocol)
+  ) {
+    return;
+  }
+
+  function printta, stringif);
+};
