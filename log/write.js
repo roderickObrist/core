@@ -15,7 +15,7 @@ let store = async data => {
   store.buffer = [data];
 
   try {
-    conn = await r.connect(rethinkdb);
+    conn = await r.connect(config.rethinkdb);
   } catch (e) {
     store = noop;
     throw e;
