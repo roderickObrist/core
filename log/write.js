@@ -173,5 +173,5 @@ module.exports = (data, stringified = JSON.stringify(data.body)) => {
     return;
   }
 
-  function printta, stringif);
+  print(data, stringified);
 };
