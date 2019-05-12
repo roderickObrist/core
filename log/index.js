@@ -235,6 +235,7 @@ exports.session = (details, stringified) => {
     : "OUT";
 
   return {
+    connectionId,
     info(nextBody, nextStringified) {
       exports.info({
         connectionId,
