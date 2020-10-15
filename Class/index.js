@@ -3,39 +3,48 @@
 
 const {config, log} = require("../index"),
   Class = require("./Class"),
-  fs = require("fs"),
-  classes = {};
+  fs = require("fs");
 
-// Get a list of all available classes
-fs.readdirSync(`${config.dir}/class`)
-  .filter(name => /^[^.]+(\.js)?$/.test(name))
-  .forEach(name => {
-    classes[name.replace(/\.js$/, "")] = null;
-  });
+function makeProxy(dir) {
+  // Get a list of all available classes
+  const classes = {},
+    options = fs.readdirSync(dir)
+      .filter(name => /^[^.]+(?:\.js)?$/u.test(name));
 
-module.exports = new Proxy(Class, {
-  get(target, property) {
-    if (!classes.hasOwnProperty(property)) {
-      return target[property];
+  for (const name of options) {
+    if (name.endsWith(".js")) {
+      classes[name.replace(/\.js$/u, "")] = null;
+    } else {
+      classes[name] = makeProxy(`${dir}/${name}`);
     }
+  }
 
-    if (classes[property] === "loading") {
-      const loadingClasses = {};
-
-      for (const [className, state] of Object.entries(classes)) {
-        if (state === "loading") {
-          loadingClasses[className] = "loading";
-        }
+  return new Proxy(Class, {
+    get(target, property) {
+      if (!classes.hasOwnProperty(property)) {
+        return target[property];
       }
 
-      throw log.error("Circular Dependency", loadingClasses);
-    }
+      if (classes[property] === "loading") {
+        const loadingClasses = {};
 
-    if (classes[property] === null) {
-      classes[property] = "loading";
-      classes[property] = require(`${config.dir}/class/${property}`);
-    }
+        for (const [className, state] of Object.entries(classes)) {
+          if (state === "loading") {
+            loadingClasses[className] = "loading";
+          }
+        }
 
-    return classes[property];
-  }
-});
+        throw log.error("Circular Dependency", loadingClasses);
+      }
+
+      if (classes[property] === null) {
+        classes[property] = "loading";
+        classes[property] = require(`${dir}/${property}`);
+      }
+
+      return classes[property];
+    }
+  });
+}
+
+module.exports = makeProxy(`${config.dir}/class`);
